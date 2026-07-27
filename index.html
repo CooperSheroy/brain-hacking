@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Brain Hacking</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar" aria-label="Workspace">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">BH</div>
+          <div>
+            <h1>Brain Hacking</h1>
+            <p>Intentional feed steering</p>
+          </div>
+        </div>
+
+        <nav class="nav-list" aria-label="Primary views">
+          <button class="nav-item is-active" type="button" data-view="planner">Planner</button>
+          <button class="nav-item" type="button" data-view="signals">Signals</button>
+          <button class="nav-item" type="button" data-view="map">Personality Map</button>
+        </nav>
+
+        <section class="connection-panel" aria-labelledby="connections-title">
+          <h2 id="connections-title">Connections</h2>
+          <div id="connectionList" class="connection-list"></div>
+        </section>
+      </aside>
+
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Local-first prototype</p>
+            <h2 id="viewTitle">Feed Steering Planner</h2>
+          </div>
+          <button id="exportButton" class="icon-button" type="button" title="Export plan" aria-label="Export plan">
+            <span aria-hidden="true">↓</span>
+          </button>
+        </header>
+
+        <section id="plannerView" class="view is-visible" aria-labelledby="viewTitle">
+          <div class="intent-grid">
+            <form id="plannerForm" class="control-panel">
+              <label>
+                Desired shift
+                <select id="goalSelect" name="goal"></select>
+              </label>
+              <label>
+                Time horizon
+                <select id="horizonSelect" name="horizon">
+                  <option value="7">7 days</option>
+                  <option value="14" selected>14 days</option>
+                  <option value="30">30 days</option>
+                </select>
+              </label>
+              <label>
+                Intensity
+                <input id="intensityInput" name="intensity" type="range" min="1" max="5" value="3" />
+              </label>
+              <label>
+                Avoid
+                <input id="avoidInput" name="avoid" type="text" placeholder="rage bait, doomscrolling, gossip" />
+              </label>
+            </form>
+
+            <section class="strategy-panel" aria-label="Strategy output">
+              <div class="panel-heading">
+                <h3>Seed Prompts</h3>
+                <span id="confidenceBadge" class="badge">Balanced</span>
+              </div>
+              <div id="promptList" class="prompt-list"></div>
+            </section>
+          </div>
+
+          <section class="timeline-panel" aria-label="Daily plan">
+            <div class="panel-heading">
+              <h3>Daily Steering Loop</h3>
+              <button id="regenerateButton" type="button">Regenerate</button>
+            </div>
+            <div id="timelineList" class="timeline-list"></div>
+          </section>
+        </section>
+
+        <section id="signalsView" class="view" aria-labelledby="signals-title">
+          <div class="section-heading">
+            <h2 id="signals-title">Feed Signals</h2>
+            <p>Paste topics from your feed or export notes. The MVP treats this as explicit user-provided data.</p>
+          </div>
+          <textarea id="signalsInput" rows="9" placeholder="Example: productivity systems, gym routines, recipes, startup advice, outrage politics"></textarea>
+          <div id="signalChips" class="chip-row"></div>
+        </section>
+
+        <section id="mapView" class="view" aria-labelledby="map-title">
+          <div class="section-heading">
+            <h2 id="map-title">Personality Portfolio</h2>
+            <p>Early read from goals and feed signals. This becomes richer once official integrations exist.</p>
+          </div>
+          <div id="portfolioGrid" class="portfolio-grid"></div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>
