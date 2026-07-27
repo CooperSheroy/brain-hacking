@@ -143,7 +143,9 @@ button:disabled {
 .timeline-item,
 .control-panel,
 .strategy-panel,
-.timeline-panel {
+.timeline-panel,
+.integration-panel,
+.scope-card {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.88);
@@ -155,6 +157,11 @@ button:disabled {
   align-items: center;
   gap: 12px;
   padding: 12px;
+}
+
+.connection-card.is-selected {
+  border-color: rgba(21, 127, 99, 0.5);
+  background: #f0faf5;
 }
 
 .connection-card div {
@@ -202,7 +209,8 @@ button:disabled {
 
 .control-panel,
 .strategy-panel,
-.timeline-panel {
+.timeline-panel,
+.integration-panel {
   padding: 18px;
   box-shadow: var(--shadow);
 }
@@ -292,6 +300,57 @@ input[type="range"] {
   color: var(--accent-strong);
 }
 
+.integration-detail {
+  display: grid;
+  gap: 14px;
+}
+
+.integration-summary {
+  display: grid;
+  gap: 8px;
+}
+
+.integration-summary div,
+.integration-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.integration-summary span,
+.integration-meta {
+  color: var(--muted);
+}
+
+.scope-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.scope-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.scope-card span {
+  color: var(--warm);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.scope-card strong,
+.scope-card p {
+  margin: 0;
+}
+
+.scope-card p {
+  color: var(--muted);
+}
+
 .section-heading {
   display: grid;
   gap: 5px;
@@ -350,6 +409,7 @@ meter {
 
   .intent-grid,
   .prompt-list,
+  .scope-grid,
   .portfolio-grid {
     grid-template-columns: 1fr;
   }

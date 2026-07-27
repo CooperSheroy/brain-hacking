@@ -12,6 +12,7 @@ The long-term direction is a consent-based personality and feed portfolio: a map
 - Personality portfolio estimate from the selected goal and user-provided feed signals.
 - Exportable local plan JSON.
 - Static browser app with a tiny Node server.
+- Provider integration foundation with OAuth/PKCE request construction, consent summaries, and normalized activity primitives.
 
 ## Run
 
@@ -42,3 +43,14 @@ Brain Hacking should help users intentionally shape their own information diet. 
 - infer or expose sensitive traits without explicit user consent and clear controls.
 
 Official platform integrations should use OAuth, least-privilege scopes, clear data retention rules, and user-visible deletion/export controls.
+
+## Integration Status
+
+Real social media account connections are not live yet. The repository now contains the production foundation for integrations:
+
+- provider catalog for Twitter/X, Instagram, Facebook, and manual import;
+- OAuth PKCE state and authorization URL construction;
+- per-scope consent and risk summaries;
+- normalized activity primitives for imported or manually supplied signals.
+
+See `docs/INTEGRATIONS.md` for the production integration plan.

@@ -30,12 +30,17 @@ Provider OAuth
 ## Modules
 
 - `src/feedPlanner.js`: deterministic goal catalog, prompt plan generation, signal analysis, and first portfolio scoring.
+- `src/integrations/providers.js`: provider catalog, scope metadata, readiness status, and supported signal types.
+- `src/integrations/oauth.js`: OAuth PKCE state, consent summaries, and authorization request construction.
+- `src/integrations/normalizedActivity.js`: normalized activity primitives for manual and future provider imports.
 - `src/app.js`: browser state management, view switching, rendering, and export.
 - `server.js`: no-framework local static server for development.
 
 ## Data Boundaries
 
 The MVP only processes text the user manually provides in the browser. No remote API calls are made.
+
+The integration foundation can construct OAuth authorization requests, but it does not exchange tokens or call provider APIs. Token exchange and storage must live in a backend service, not in the static browser UI.
 
 For the long-term version, every platform connector needs:
 

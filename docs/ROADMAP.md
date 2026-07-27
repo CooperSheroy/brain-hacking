@@ -13,9 +13,11 @@
 - Add before/after feed snapshots entered by the user.
 - Track steering effectiveness across goals.
 - Improve personality portfolio scoring with transparent dimensions.
+- Use normalized activity records as the internal source model.
 
 ## Milestone 3: Official Integrations
 
+- Add backend OAuth callback handling and encrypted token storage.
 - Add OAuth adapters for supported social platforms.
 - Normalize imported follows, saves, likes, topics, and muted content.
 - Add clear permission controls and deletion/export.

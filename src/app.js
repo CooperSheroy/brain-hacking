@@ -1,11 +1,15 @@
-import { analyzeSignals, createPlan, goals, platforms } from "./feedPlanner.js";
+import { analyzeSignals, createPlan, goals } from "./feedPlanner.js";
+import { createOAuthState, summarizeConsent } from "./integrations/oauth.js";
+import { normalizeManualSignals, summarizeActivities } from "./integrations/normalizedActivity.js";
+import { getProvider, providerCatalog } from "./integrations/providers.js";
 
 const state = {
   goalId: "discipline",
   horizonDays: 14,
   intensity: 3,
   avoid: "",
-  signals: "discipline systems, gym routines, high protein recipes, deep work, founder advice"
+  signals: "discipline systems, gym routines, high protein recipes, deep work, founder advice",
+  selectedProviderId: "twitter"
 };
 
 const goalSelect = document.querySelector("#goalSelect");
@@ -20,18 +24,20 @@ const signalsInput = document.querySelector("#signalsInput");
 const signalChips = document.querySelector("#signalChips");
 const portfolioGrid = document.querySelector("#portfolioGrid");
 const viewTitle = document.querySelector("#viewTitle");
+const integrationDetail = document.querySelector("#integrationDetail");
+const selectedProviderBadge = document.querySelector("#selectedProviderBadge");
 
 function init() {
   goalSelect.innerHTML = goals.map((goal) => `<option value="${goal.id}">${goal.label}</option>`).join("");
-  connectionList.innerHTML = platforms
+  connectionList.innerHTML = providerCatalog
     .map(
       (platform) => `
-        <article class="connection-card">
+        <article class="connection-card ${platform.id === state.selectedProviderId ? "is-selected" : ""}">
           <div>
             <strong>${platform.label}</strong>
-            <span>${platform.status}</span>
+            <span>${formatStatus(platform.status)}</span>
           </div>
-          <button type="button" ${platform.id !== "manual" ? "disabled" : ""}>${platform.id === "manual" ? "Import" : "Soon"}</button>
+          <button type="button" data-provider="${platform.id}">${platform.mode === "local" ? "Use" : "Review"}</button>
         </article>
       `
     )
@@ -61,6 +67,14 @@ function bindEvents() {
 
   document.querySelector("#regenerateButton").addEventListener("click", renderPlan);
   document.querySelector("#exportButton").addEventListener("click", exportPlan);
+
+  connectionList.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-provider]");
+    if (!button) return;
+    state.selectedProviderId = button.dataset.provider;
+    renderConnections();
+    renderIntegrationDetail();
+  });
 }
 
 function switchView(view) {
@@ -74,8 +88,17 @@ function switchView(view) {
 }
 
 function render() {
+  renderConnections();
   renderPlan();
   renderSignals();
+  renderIntegrationDetail();
+}
+
+function renderConnections() {
+  document.querySelectorAll(".connection-card").forEach((card) => {
+    const button = card.querySelector("[data-provider]");
+    card.classList.toggle("is-selected", button?.dataset.provider === state.selectedProviderId);
+  });
 }
 
 function renderPlan() {
@@ -110,6 +133,8 @@ function renderPlan() {
 
 function renderSignals() {
   const analysis = analyzeSignals(state.signals, state.goalId);
+  const activities = normalizeManualSignals(state.signals);
+  const activitySummary = summarizeActivities(activities);
   signalChips.innerHTML = analysis.topSignals
     .map((signal) => `<span class="chip">${signal.label}<strong>${signal.weight}</strong></span>`)
     .join("");
@@ -129,14 +154,71 @@ function renderSignals() {
       `
     )
     .join("");
+  signalChips.insertAdjacentHTML(
+    "beforeend",
+    `<span class="chip">local activities<strong>${activitySummary.total}</strong></span>`
+  );
+}
+
+function renderIntegrationDetail() {
+  const provider = getProvider(state.selectedProviderId);
+  const consent = summarizeConsent(provider, provider.defaultScopes);
+  selectedProviderBadge.textContent = provider.label;
+  const callbackUrl = `${location.origin}/oauth/callback`;
+  const statePreview =
+    provider.mode === "oauth-pkce"
+      ? createOAuthState({
+          providerId: provider.id,
+          scopes: provider.defaultScopes,
+          redirectUri: callbackUrl
+        })
+      : null;
+
+  integrationDetail.innerHTML = `
+    <div class="integration-summary">
+      <div>
+        <strong>${provider.label}</strong>
+        <span>${formatStatus(provider.status)}</span>
+      </div>
+      <p>${provider.mode === "local" ? "Processes explicit local text only." : "OAuth PKCE foundation ready; real connection requires registered app credentials."}</p>
+    </div>
+    <div class="scope-grid">
+      ${consent
+        .map(
+          (scope) => `
+            <article class="scope-card">
+              <span>${scope.risk} risk</span>
+              <strong>${scope.label}</strong>
+              <p>${scope.reason}</p>
+            </article>
+          `
+        )
+        .join("")}
+    </div>
+    <div class="integration-meta">
+      <span>Signals: ${provider.supportedSignals.join(", ")}</span>
+      ${
+        statePreview
+          ? `<span>Redirect: ${statePreview.redirectUri}</span><span>State nonce generated locally</span>`
+          : "<span>No external authorization required</span>"
+      }
+    </div>
+  `;
 }
 
 function exportPlan() {
   const plan = createPlan(state);
+  const provider = getProvider(state.selectedProviderId);
   const payload = {
     project: "Brain Hacking",
     exportedAt: new Date().toISOString(),
     state,
+    selectedProvider: {
+      id: provider.id,
+      label: provider.label,
+      mode: provider.mode,
+      scopes: provider.defaultScopes
+    },
     plan
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -145,6 +227,10 @@ function exportPlan() {
   link.download = "brain-hacking-plan.json";
   link.click();
   URL.revokeObjectURL(link.href);
+}
+
+function formatStatus(status) {
+  return status.replaceAll("-", " ");
 }
 
 init();

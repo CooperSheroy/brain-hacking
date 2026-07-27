@@ -29,13 +29,6 @@ export const goals = [
   }
 ];
 
-export const platforms = [
-  { id: "twitter", label: "Twitter/X", status: "planned API" },
-  { id: "instagram", label: "Instagram", status: "planned API" },
-  { id: "facebook", label: "Facebook", status: "planned API" },
-  { id: "manual", label: "Manual import", status: "ready" }
-];
-
 export function createPlan({ goalId, horizonDays = 14, intensity = 3, avoid = "" }) {
   const goal = goals.find((item) => item.id === goalId) || goals[0];
   const avoidTerms = avoid

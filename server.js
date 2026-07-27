@@ -16,7 +16,10 @@ const types = {
 function resolvePath(url) {
   const requested = new URL(url, `http://localhost:${port}`).pathname;
   const clean = normalize(decodeURIComponent(requested)).replace(/^(\.\.[/\\])+/, "");
-  return join(root, clean === "/" ? "index.html" : clean);
+  if (clean === "/" || !extname(clean)) {
+    return join(root, "index.html");
+  }
+  return join(root, clean);
 }
 
 const server = createServer(async (req, res) => {
