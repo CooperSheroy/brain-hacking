@@ -103,6 +103,10 @@ export function getProvider(providerId) {
   return provider;
 }
 
+export function getProviderIds() {
+  return providerCatalog.map((provider) => provider.id);
+}
+
 export function getConnectableProviders() {
   return providerCatalog.filter((provider) => provider.mode === "oauth-pkce");
 }

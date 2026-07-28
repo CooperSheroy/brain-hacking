@@ -15,7 +15,17 @@ Provider catalog
   -> Feed/personality analysis
 ```
 
-The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, and normalized manual activity ingestion. The missing production backend pieces are callback handling, token exchange, encrypted token storage, scheduled imports, and real provider API clients.
+The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, normalized manual activity ingestion, and an import adapter contract. The missing production backend pieces are callback handling, token exchange, encrypted token storage, scheduled imports, and real provider API clients.
+
+## Adapter Contract
+
+Provider imports enter the product through `src/integrations/adapters.js`.
+
+- Manual import is the only adapter that can import activities today. It accepts user-supplied text and emits normalized local activities.
+- OAuth providers expose read-only adapter readiness, required scopes, guardrails, and blockers, but their import methods intentionally fail until backend OAuth callback exchange and encrypted server-side token storage exist.
+- Adapter guardrails explicitly prohibit password collection, browser token storage, and automated engagement.
+
+This keeps UI and planner code adapter-oriented without implying that real social API access is available before official OAuth infrastructure is built.
 
 ## Provider Readiness
 
@@ -39,7 +49,7 @@ The current repository includes the provider catalog, consent summaries, OAuth P
 
 ### Manual Import
 
-- Current status: ready.
+- Current status: ready through the local manual adapter.
 - First target signals: pasted topics, export notes, self-audits, feed observations.
 - Risk: lower automation, but strongest privacy posture for the MVP.
 

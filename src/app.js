@@ -1,4 +1,5 @@
 import { analyzeSignals, createPlan, goals } from "./feedPlanner.js";
+import { getImportAdapter, summarizeAdapterReadiness } from "./integrations/adapters.js";
 import { createOAuthState, summarizeConsent } from "./integrations/oauth.js";
 import { normalizeManualSignals, summarizeActivities } from "./integrations/normalizedActivity.js";
 import { getProvider, providerCatalog } from "./integrations/providers.js";
@@ -163,6 +164,8 @@ function renderSignals() {
 function renderIntegrationDetail() {
   const provider = getProvider(state.selectedProviderId);
   const consent = summarizeConsent(provider, provider.defaultScopes);
+  const adapter = getImportAdapter(provider.id);
+  const readiness = summarizeAdapterReadiness(provider.id);
   selectedProviderBadge.textContent = provider.label;
   const callbackUrl = `${location.origin}/oauth/callback`;
   const statePreview =
@@ -180,7 +183,21 @@ function renderIntegrationDetail() {
         <strong>${provider.label}</strong>
         <span>${formatStatus(provider.status)}</span>
       </div>
-      <p>${provider.mode === "local" ? "Processes explicit local text only." : "OAuth PKCE foundation ready; real connection requires registered app credentials."}</p>
+      <p>${readiness.canImportNow ? "Processes explicit local text only through the manual adapter." : "Official OAuth adapter is read-only by design and waits for backend token handling."}</p>
+    </div>
+    <div class="adapter-card">
+      <div>
+        <span>Adapter</span>
+        <strong>${adapter.kind}</strong>
+      </div>
+      <div>
+        <span>Mode</span>
+        <strong>${readiness.importMode}</strong>
+      </div>
+      <div>
+        <span>Next</span>
+        <strong>${readiness.nextRequiredStep}</strong>
+      </div>
     </div>
     <div class="scope-grid">
       ${consent
@@ -217,7 +234,8 @@ function exportPlan() {
       id: provider.id,
       label: provider.label,
       mode: provider.mode,
-      scopes: provider.defaultScopes
+      scopes: provider.defaultScopes,
+      adapter: summarizeAdapterReadiness(provider.id)
     },
     plan
   };

@@ -31,6 +31,7 @@ Provider OAuth
 
 - `src/feedPlanner.js`: deterministic goal catalog, prompt plan generation, signal analysis, and first portfolio scoring.
 - `src/integrations/providers.js`: provider catalog, scope metadata, readiness status, and supported signal types.
+- `src/integrations/adapters.js`: import adapter contract that allows local manual ingestion now and gates official OAuth imports behind backend token infrastructure.
 - `src/integrations/oauth.js`: OAuth PKCE state, consent summaries, and authorization request construction.
 - `src/integrations/normalizedActivity.js`: normalized activity primitives for manual and future provider imports.
 - `src/app.js`: browser state management, view switching, rendering, and export.
