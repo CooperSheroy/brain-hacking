@@ -1,6 +1,6 @@
 import { analyzeSignals, createPlan, goals } from "./feedPlanner.js";
 import { getImportAdapter, summarizeAdapterReadiness } from "./integrations/adapters.js";
-import { createOAuthState, summarizeConsent } from "./integrations/oauth.js";
+import { summarizeConsent } from "./integrations/oauth.js";
 import { normalizeManualSignals, summarizeActivities } from "./integrations/normalizedActivity.js";
 import { getProvider, providerCatalog } from "./integrations/providers.js";
 
@@ -168,14 +168,7 @@ function renderIntegrationDetail() {
   const readiness = summarizeAdapterReadiness(provider.id);
   selectedProviderBadge.textContent = provider.label;
   const callbackUrl = `${location.origin}/oauth/callback`;
-  const statePreview =
-    provider.mode === "oauth-pkce"
-      ? createOAuthState({
-          providerId: provider.id,
-          scopes: provider.defaultScopes,
-          redirectUri: callbackUrl
-        })
-      : null;
+  const authorizationEndpoint = `${location.origin}/api/oauth/authorization?provider=${provider.id}`;
 
   integrationDetail.innerHTML = `
     <div class="integration-summary">
@@ -215,8 +208,8 @@ function renderIntegrationDetail() {
     <div class="integration-meta">
       <span>Signals: ${provider.supportedSignals.join(", ")}</span>
       ${
-        statePreview
-          ? `<span>Redirect: ${statePreview.redirectUri}</span><span>State nonce generated locally</span>`
+        provider.mode === "oauth-pkce"
+          ? `<span>Start: ${authorizationEndpoint}</span><span>Redirect: ${callbackUrl}</span>`
           : "<span>No external authorization required</span>"
       }
     </div>

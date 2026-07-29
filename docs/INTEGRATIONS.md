@@ -15,7 +15,7 @@ Provider catalog
   -> Feed/personality analysis
 ```
 
-The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, normalized manual activity ingestion, and an import adapter contract. The missing production backend pieces are callback handling, token exchange, encrypted token storage, scheduled imports, and real provider API clients.
+The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, normalized manual activity ingestion, and an import adapter contract. The missing production backend pieces are token exchange, encrypted token storage, scheduled imports, and real provider API clients.
 
 ## Adapter Contract
 
@@ -24,6 +24,7 @@ Provider imports enter the product through `src/integrations/adapters.js`.
 - Manual import is the only adapter that can import activities today. It accepts user-supplied text and emits normalized local activities.
 - OAuth providers expose read-only adapter readiness, required scopes, guardrails, and blockers, but their import methods intentionally fail until backend OAuth callback exchange and encrypted server-side token storage exist.
 - Adapter guardrails explicitly prohibit password collection, browser token storage, and automated engagement.
+- The local server exposes `/api/oauth/authorization?provider=twitter` for backend-generated PKCE state and `/oauth/callback` for verified callback intake. The callback response stores no raw authorization code or token material.
 
 This keeps UI and planner code adapter-oriented without implying that real social API access is available before official OAuth infrastructure is built.
 
@@ -66,7 +67,7 @@ This keeps UI and planner code adapter-oriented without implying that real socia
 
 ## Production Milestones
 
-1. Backend callback service and encrypted token vault.
+1. Encrypted token vault and backend token exchange using the verified callback intake.
 2. Twitter/X read-only import adapter behind feature flag.
 3. Local normalized activity store.
 4. Scheduled import worker with rate limiting and audit logs.

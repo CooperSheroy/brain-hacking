@@ -33,6 +33,7 @@ Provider OAuth
 - `src/integrations/providers.js`: provider catalog, scope metadata, readiness status, and supported signal types.
 - `src/integrations/adapters.js`: import adapter contract that allows local manual ingestion now and gates official OAuth imports behind backend token infrastructure.
 - `src/integrations/oauth.js`: OAuth PKCE state, consent summaries, and authorization request construction.
+- `src/integrations/oauthCallback.js`: server-side OAuth callback verification and no-token audit result shaping.
 - `src/integrations/normalizedActivity.js`: normalized activity primitives for manual and future provider imports.
 - `src/app.js`: browser state management, view switching, rendering, and export.
 - `server.js`: no-framework local static server for development.
@@ -41,7 +42,7 @@ Provider OAuth
 
 The MVP only processes text the user manually provides in the browser. No remote API calls are made.
 
-The integration foundation can construct OAuth authorization requests, but it does not exchange tokens or call provider APIs. Token exchange and storage must live in a backend service, not in the static browser UI.
+The integration foundation can construct OAuth authorization requests and verify callback state on the local Node server, but it does not exchange tokens or call provider APIs. Token exchange and storage must live in a backend service, not in the static browser UI.
 
 For the long-term version, every platform connector needs:
 
