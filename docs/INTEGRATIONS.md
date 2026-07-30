@@ -15,7 +15,7 @@ Provider catalog
   -> Feed/personality analysis
 ```
 
-The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, normalized manual activity ingestion, and an import adapter contract. The missing production backend pieces are token exchange, encrypted token storage, scheduled imports, and real provider API clients.
+The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, normalized manual activity ingestion, provider activity normalization, and an import adapter contract. The missing production backend pieces are token exchange, encrypted token storage, scheduled imports, and real provider API clients.
 
 ## Adapter Contract
 
@@ -27,6 +27,16 @@ Provider imports enter the product through `src/integrations/adapters.js`.
 - The local server exposes `/api/oauth/authorization?provider=twitter` for backend-generated PKCE state and `/oauth/callback` for verified callback intake. The callback response stores no raw authorization code or token material.
 
 This keeps UI and planner code adapter-oriented without implying that real social API access is available before official OAuth infrastructure is built.
+
+## Normalized Activity Contract
+
+Official API clients should translate platform payloads through `normalizeProviderActivities(providerId, records)` before planner or portfolio code sees them. The normalizer accepts provider-owned identifiers, read-scope provenance, timestamps, URLs, and explicit labels, then emits a constrained internal record:
+
+- `id`, `source`, `type`, `label`, `weight`, and `capturedAt` are always present.
+- `externalId`, `url`, and `permissionScope` are retained when supplied.
+- Raw platform payloads, access tokens, private message content, and unrecognized signal types are not accepted by the normalized activity boundary.
+
+This keeps future OAuth adapters focused on least-privilege read imports and makes unsupported or sensitive data fail closed.
 
 ## Provider Readiness
 
@@ -68,7 +78,7 @@ This keeps UI and planner code adapter-oriented without implying that real socia
 ## Production Milestones
 
 1. Encrypted token vault and backend token exchange using the verified callback intake.
-2. Twitter/X read-only import adapter behind feature flag.
+2. Twitter/X read-only API client that maps official payloads through the normalized activity contract behind a feature flag.
 3. Local normalized activity store.
 4. Scheduled import worker with rate limiting and audit logs.
 5. Portfolio map generated from normalized activities.
