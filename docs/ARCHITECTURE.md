@@ -30,6 +30,7 @@ Provider OAuth
 ## Modules
 
 - `src/feedPlanner.js`: deterministic goal catalog, prompt plan generation, signal analysis, and first portfolio scoring.
+- `src/portfolioModel.js`: explainable portfolio dimensions and content clusters derived from normalized activity records.
 - `src/integrations/providers.js`: provider catalog, scope metadata, readiness status, and supported signal types.
 - `src/integrations/adapters.js`: import adapter contract that allows local manual ingestion now and gates official OAuth imports behind backend token infrastructure.
 - `src/integrations/oauth.js`: OAuth PKCE state, consent summaries, and authorization request construction.
@@ -40,7 +41,7 @@ Provider OAuth
 
 ## Data Boundaries
 
-The MVP only processes text the user manually provides in the browser. No remote API calls are made.
+The MVP only processes text the user manually provides in the browser. No remote API calls are made. Manual text is first converted into normalized local activity records, then the portfolio model reads those records through the same boundary planned for official integrations.
 
 The integration foundation can construct OAuth authorization requests and verify callback state on the local Node server, but it does not exchange tokens or call provider APIs. Token exchange and storage must live in a backend service, not in the static browser UI.
 

@@ -38,6 +38,12 @@ Official API clients should translate platform payloads through `normalizeProvid
 
 This keeps future OAuth adapters focused on least-privilege read imports and makes unsupported or sensitive data fail closed.
 
+## Portfolio Model Boundary
+
+`src/portfolioModel.js` consumes only normalized activity records. It returns explainable portfolio dimensions, source/type summaries, and top content clusters without preserving raw provider payloads or token material.
+
+Current dimensions are aspiration alignment, attention focus, novelty, execution bias, and noise exposure. They are deterministic MVP heuristics intended to make scoring transparent while future OAuth adapters and local history storage mature.
+
 ## Provider Readiness
 
 ### Twitter/X

@@ -3,6 +3,7 @@ import { getImportAdapter, summarizeAdapterReadiness } from "./integrations/adap
 import { summarizeConsent } from "./integrations/oauth.js";
 import { normalizeManualSignals, summarizeActivities } from "./integrations/normalizedActivity.js";
 import { getProvider, providerCatalog } from "./integrations/providers.js";
+import { buildPortfolioMap } from "./portfolioModel.js";
 
 const state = {
   goalId: "discipline",
@@ -136,28 +137,32 @@ function renderSignals() {
   const analysis = analyzeSignals(state.signals, state.goalId);
   const activities = normalizeManualSignals(state.signals);
   const activitySummary = summarizeActivities(activities);
+  const portfolio = buildPortfolioMap(activities, state.goalId);
   signalChips.innerHTML = analysis.topSignals
-    .map((signal) => `<span class="chip">${signal.label}<strong>${signal.weight}</strong></span>`)
+    .map((signal) => `<span class="chip">${escapeHtml(signal.label)}<strong>${signal.weight}</strong></span>`)
     .join("");
-  portfolioGrid.innerHTML = [
-    { label: "Goal alignment", value: analysis.alignment },
-    ...analysis.traits
-  ]
+  portfolioGrid.innerHTML = portfolio.dimensions
     .map(
       (item) => `
         <article class="portfolio-card">
           <div>
-            <strong>${item.label}</strong>
+            <strong>${escapeHtml(item.label)}</strong>
             <span>${item.value}%</span>
           </div>
           <meter min="0" max="100" value="${item.value}"></meter>
+          <p>${escapeHtml(formatEvidence(item))}</p>
         </article>
       `
     )
     .join("");
   signalChips.insertAdjacentHTML(
     "beforeend",
-    `<span class="chip">local activities<strong>${activitySummary.total}</strong></span>`
+    [
+      `<span class="chip">local activities<strong>${activitySummary.total}</strong></span>`,
+      ...portfolio.clusters
+        .slice(0, 4)
+        .map((cluster) => `<span class="chip">${escapeHtml(cluster.label)}<strong>${cluster.weight}</strong></span>`)
+    ].join("")
   );
 }
 
@@ -219,6 +224,7 @@ function renderIntegrationDetail() {
 function exportPlan() {
   const plan = createPlan(state);
   const provider = getProvider(state.selectedProviderId);
+  const localActivities = normalizeManualSignals(state.signals);
   const payload = {
     project: "Brain Hacking",
     exportedAt: new Date().toISOString(),
@@ -230,6 +236,8 @@ function exportPlan() {
       scopes: provider.defaultScopes,
       adapter: summarizeAdapterReadiness(provider.id)
     },
+    localActivitySummary: summarizeActivities(localActivities),
+    portfolio: buildPortfolioMap(localActivities, state.goalId),
     plan
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -242,6 +250,19 @@ function exportPlan() {
 
 function formatStatus(status) {
   return status.replaceAll("-", " ");
+}
+
+function formatEvidence(item) {
+  return item.evidence.length ? item.evidence.join(", ") : item.explanation;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 init();
