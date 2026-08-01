@@ -1,3 +1,5 @@
+import { getProvider } from "./providers.js";
+
 const activityTypeAliases = new Map([
   ["bookmarks", "bookmark"],
   ["creator clusters", "follow"],
@@ -31,6 +33,15 @@ const allowedActivityTypes = new Set([
   "topic"
 ]);
 
+const prohibitedProviderFields = new Set([
+  "accessToken",
+  "authorizationCode",
+  "privateMessage",
+  "rawPayload",
+  "refreshToken",
+  "token"
+]);
+
 export function normalizeManualSignals(text, source = "manual") {
   return text
     .split(/[\n,]/u)
@@ -57,9 +68,11 @@ export function normalizeProviderActivity(providerId, record = {}, index = 0) {
   if (!providerId || typeof providerId !== "string") {
     throw new TypeError("Provider id is required to normalize provider activity.");
   }
+  const provider = getProvider(providerId);
   if (!record || typeof record !== "object" || Array.isArray(record)) {
     throw new TypeError("Provider activity record must be an object.");
   }
+  rejectProhibitedFields(record);
 
   const externalId = cleanScalar(record.externalId ?? record.id ?? `${index + 1}`);
   const label = cleanScalar(record.label ?? record.title ?? record.name ?? record.text ?? record.caption);
@@ -77,12 +90,12 @@ export function normalizeProviderActivity(providerId, record = {}, index = 0) {
     externalId
   };
 
-  const url = cleanScalar(record.url ?? record.permalink);
+  const url = normalizeUrl(record.url ?? record.permalink);
   if (url) {
     activity.url = url;
   }
 
-  const permissionScope = cleanScalar(record.permissionScope ?? record.scope);
+  const permissionScope = normalizePermissionScope(provider, record.permissionScope ?? record.scope);
   if (permissionScope) {
     activity.permissionScope = permissionScope;
   }
@@ -126,6 +139,38 @@ function normalizeTimestamp(value) {
   return timestamp.toISOString();
 }
 
+function normalizeUrl(value) {
+  const url = cleanScalar(value);
+  if (!url) {
+    return "";
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(`Invalid activity URL: ${url}`);
+  }
+
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new Error(`Unsupported activity URL protocol: ${parsed.protocol}`);
+  }
+  return parsed.href;
+}
+
+function normalizePermissionScope(provider, value) {
+  const permissionScope = cleanScalar(value);
+  if (!permissionScope) {
+    return "";
+  }
+
+  const allowedScopes = new Set(provider.scopes.map((scope) => scope.id));
+  if (!allowedScopes.has(permissionScope)) {
+    throw new Error(`Unsupported permission scope for ${provider.id}: ${permissionScope}`);
+  }
+  return permissionScope;
+}
+
 function normalizeWeight(value) {
   if (value === undefined || value === null || value === "") {
     return 1;
@@ -139,4 +184,12 @@ function normalizeWeight(value) {
 
 function cleanScalar(value) {
   return String(value ?? "").trim();
+}
+
+function rejectProhibitedFields(record) {
+  for (const field of prohibitedProviderFields) {
+    if (Object.hasOwn(record, field)) {
+      throw new Error(`Provider activity record must not include ${field}.`);
+    }
+  }
 }

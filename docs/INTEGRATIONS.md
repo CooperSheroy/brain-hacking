@@ -34,7 +34,8 @@ Official API clients should translate platform payloads through `normalizeProvid
 
 - `id`, `source`, `type`, `label`, `weight`, and `capturedAt` are always present.
 - `externalId`, `url`, and `permissionScope` are retained when supplied.
-- Raw platform payloads, access tokens, private message content, and unrecognized signal types are not accepted by the normalized activity boundary.
+- `permissionScope` must match a scope declared for that provider, and retained URLs must use `http` or `https`.
+- Raw platform payloads, access tokens, authorization codes, private message content, and unrecognized signal types are not accepted by the normalized activity boundary.
 
 This keeps future OAuth adapters focused on least-privilege read imports and makes unsupported or sensitive data fail closed.
 

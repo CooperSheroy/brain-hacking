@@ -74,3 +74,25 @@ test("normalizeProviderActivities rejects unsupported provider record shapes", (
   assert.throws(() => normalizeProviderActivities("twitter", [{ type: "direct_messages", text: "private" }]), /Unsupported/u);
   assert.throws(() => normalizeProviderActivities("twitter", [{ type: "likes" }]), /requires a label/u);
 });
+
+test("normalizeProviderActivities enforces provider permission and URL guardrails", () => {
+  assert.throws(
+    () => normalizeProviderActivities("twitter", [{ type: "likes", text: "Deep work", scope: "dm.read" }]),
+    /Unsupported permission scope/u
+  );
+  assert.throws(
+    () => normalizeProviderActivities("twitter", [{ type: "likes", text: "Deep work", url: "javascript:alert(1)" }]),
+    /Unsupported activity URL protocol/u
+  );
+  assert.throws(
+    () => normalizeProviderActivities("twitter", [{ type: "likes", text: "Deep work", accessToken: "secret" }]),
+    /must not include accessToken/u
+  );
+});
+
+test("normalizeProviderActivities rejects unknown providers before importing records", () => {
+  assert.throws(
+    () => normalizeProviderActivities("unknown", [{ type: "likes", text: "Deep work" }]),
+    /Unknown provider/u
+  );
+});
