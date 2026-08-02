@@ -15,18 +15,19 @@ Provider catalog
   -> Feed/personality analysis
 ```
 
-The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, normalized manual activity ingestion, provider activity normalization, and an import adapter contract. The missing production backend pieces are token exchange, encrypted token storage, scheduled imports, and real provider API clients.
+The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, encrypted token vault primitives, normalized manual activity ingestion, provider activity normalization, and an import adapter contract. The missing production backend pieces are token exchange, persistent encrypted storage wiring, scheduled imports, and real provider API clients.
 
 ## Adapter Contract
 
 Provider imports enter the product through `src/integrations/adapters.js`.
 
 - Manual import is the only adapter that can import activities today. It accepts user-supplied text and emits normalized local activities.
-- OAuth providers expose read-only adapter readiness, required scopes, guardrails, and blockers, but their import methods intentionally fail until backend OAuth callback exchange and encrypted server-side token storage exist.
+- OAuth providers expose read-only adapter readiness, required scopes, guardrails, and blockers, but their import methods intentionally fail until backend OAuth token exchange is wired to the encrypted token vault and production controls.
 - Adapter guardrails explicitly prohibit password collection, browser token storage, and automated engagement.
 - The local server exposes `/api/oauth/authorization?provider=twitter` for backend-generated PKCE state and `/oauth/callback` for verified callback intake. The callback response stores no raw authorization code or token material.
+- `src/integrations/tokenVault.js` provides the backend-only encrypted token envelope primitive for future OAuth token exchange wiring. It has no public endpoint, accepts only least-privilege catalog scopes, and keeps raw tokens out of grant summaries and browser code.
 
-This keeps UI and planner code adapter-oriented without implying that real social API access is available before official OAuth infrastructure is built.
+This keeps UI and planner code adapter-oriented without implying that real social API access is available before official OAuth token exchange, persistent encrypted storage, disconnect controls, and import workers are built.
 
 ## Normalized Activity Contract
 
@@ -84,9 +85,10 @@ Current dimensions are aspiration alignment, attention focus, novelty, execution
 
 ## Production Milestones
 
-1. Encrypted token vault and backend token exchange using the verified callback intake.
-2. Twitter/X read-only API client that maps official payloads through the normalized activity contract behind a feature flag.
-3. Local normalized activity store.
-4. Scheduled import worker with rate limiting and audit logs.
-5. Portfolio map generated from normalized activities.
-6. Instagram/Facebook feasibility spikes based on official API limits.
+1. Backend token exchange using the verified callback intake and encrypted token vault.
+2. Persistent encrypted token store plus disconnect/delete/export controls.
+3. Twitter/X read-only API client that maps official payloads through the normalized activity contract behind a feature flag.
+4. Local normalized activity store.
+5. Scheduled import worker with rate limiting and audit logs.
+6. Portfolio map generated from normalized activities.
+7. Instagram/Facebook feasibility spikes based on official API limits.

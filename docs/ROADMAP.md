@@ -17,7 +17,7 @@
 
 ## Milestone 3: Official Integrations
 
-- Add backend OAuth callback handling and encrypted token storage.
+- Add backend OAuth callback handling and encrypted token vault wiring.
 - Extend the read-only OAuth adapter contract into platform API clients after token storage exists.
 - Normalize imported follows, saves, likes, topics, and muted content.
 - Add clear permission controls and deletion/export.

@@ -2,8 +2,7 @@ import { normalizeManualSignals, summarizeActivities } from "./normalizedActivit
 import { getProvider, getProviderIds, providerCatalog } from "./providers.js";
 
 const oauthImportBlockers = [
-  "backend OAuth callback exchange",
-  "encrypted server-side token storage",
+  "backend OAuth token exchange wired to the encrypted token vault",
   "provider rate-limit handling",
   "user-visible disconnect and deletion controls"
 ];
@@ -75,7 +74,7 @@ function createOfficialOAuthAdapter(provider) {
     supportedSignals: [...provider.supportedSignals],
     requiredScopes: [...provider.defaultScopes],
     blockers: [...oauthImportBlockers],
-    nextRequiredStep: "Implement backend OAuth callback exchange and encrypted token storage before API imports.",
+    nextRequiredStep: "Wire backend OAuth token exchange to the encrypted token vault before API imports.",
     guardrails: [
       "request least-privilege read scopes",
       "store tokens server-side only",
@@ -83,7 +82,7 @@ function createOfficialOAuthAdapter(provider) {
     ],
     importActivities() {
       throw new Error(
-        `${provider.label} imports require official OAuth callback handling and encrypted server-side token storage first.`
+        `${provider.label} imports require official OAuth token exchange and encrypted server-side token vault wiring first.`
       );
     }
   };

@@ -28,5 +28,5 @@ test("official OAuth adapters are capability-gated until backend token handling 
   assert.equal(adapter.canImportNow, false);
   assert.equal(readiness.importMode, "official OAuth read import");
   assert.ok(readiness.guardrails.some((guardrail) => guardrail.includes("least-privilege")));
-  assert.throws(() => adapter.importActivities(), /server-side token storage/u);
+  assert.throws(() => adapter.importActivities(), /token vault wiring/u);
 });
