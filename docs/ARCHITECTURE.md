@@ -30,7 +30,7 @@ Provider OAuth
 ## Modules
 
 - `src/feedPlanner.js`: deterministic goal catalog, prompt plan generation, signal analysis, and first portfolio scoring.
-- `src/portfolioModel.js`: explainable portfolio dimensions and content clusters derived from normalized activity records.
+- `src/portfolioModel.js`: explainable portfolio dimensions, content clusters, and snapshot deltas derived from normalized activity records.
 - `src/integrations/providers.js`: provider catalog, scope metadata, readiness status, and supported signal types.
 - `src/integrations/adapters.js`: import adapter contract that allows local manual ingestion now and gates official OAuth imports behind backend token infrastructure.
 - `src/integrations/oauth.js`: OAuth PKCE state, consent summaries, and authorization request construction.

@@ -46,6 +46,8 @@ This keeps future OAuth adapters focused on least-privilege read imports and mak
 
 Current dimensions are aspiration alignment, attention focus, novelty, execution bias, and noise exposure. They are deterministic MVP heuristics intended to make scoring transparent while future OAuth adapters and local history storage mature.
 
+The same boundary now supports snapshot comparisons through `comparePortfolioMaps(beforeActivities, afterActivities, goalId)`. It reports dimension deltas, activity-count movement, emerging clusters, fading clusters, and a short headline without storing raw provider payloads. This is the foundation for weekly "what changed" summaries once local history and official read imports exist.
+
 ## Provider Readiness
 
 ### Twitter/X

@@ -83,6 +83,61 @@ export function buildPortfolioMap(activities = [], selectedGoalId = "discipline"
   };
 }
 
+export function comparePortfolioMaps(beforeActivities = [], afterActivities = [], selectedGoalId = "discipline") {
+  const before = buildPortfolioMap(beforeActivities, selectedGoalId);
+  const after = buildPortfolioMap(afterActivities, selectedGoalId);
+  const beforeClusters = new Map(before.clusters.map((cluster) => [cluster.label, cluster]));
+  const afterClusters = new Map(after.clusters.map((cluster) => [cluster.label, cluster]));
+
+  const dimensions = after.dimensions.map((current) => {
+    const previous = before.dimensions.find((dimension) => dimension.id === current.id);
+    const delta = current.value - (previous?.value ?? 0);
+    return {
+      id: current.id,
+      label: current.label,
+      before: previous?.value ?? 0,
+      after: current.value,
+      delta,
+      direction: describeDirection(delta)
+    };
+  });
+
+  const emergingClusters = after.clusters
+    .map((cluster) => ({
+      label: cluster.label,
+      before: beforeClusters.get(cluster.label)?.weight ?? 0,
+      after: cluster.weight,
+      delta: cluster.weight - (beforeClusters.get(cluster.label)?.weight ?? 0),
+      goalMatched: cluster.goalMatched
+    }))
+    .filter((cluster) => cluster.delta > 0)
+    .sort(sortClusterDeltas)
+    .slice(0, 5);
+
+  const fadingClusters = before.clusters
+    .map((cluster) => ({
+      label: cluster.label,
+      before: cluster.weight,
+      after: afterClusters.get(cluster.label)?.weight ?? 0,
+      delta: (afterClusters.get(cluster.label)?.weight ?? 0) - cluster.weight,
+      goalMatched: cluster.goalMatched
+    }))
+    .filter((cluster) => cluster.delta < 0)
+    .sort(sortClusterDeltas)
+    .slice(0, 5);
+
+  return {
+    goal: after.goal,
+    beforeSummary: before.summary,
+    afterSummary: after.summary,
+    activityDelta: after.summary.total - before.summary.total,
+    dimensions,
+    emergingClusters,
+    fadingClusters,
+    headline: createChangeHeadline(dimensions, emergingClusters)
+  };
+}
+
 function toWeightedActivity(activity) {
   if (!activity || typeof activity !== "object" || Array.isArray(activity)) {
     throw new TypeError("Portfolio activity must be an object.");
@@ -158,4 +213,33 @@ function tokenize(value) {
     .toLowerCase()
     .split(/[^a-z0-9+#]+/u)
     .filter((token) => token.length > 2);
+}
+
+function describeDirection(delta) {
+  if (delta > 0) {
+    return "up";
+  }
+  if (delta < 0) {
+    return "down";
+  }
+  return "flat";
+}
+
+function sortClusterDeltas(a, b) {
+  return Math.abs(b.delta) - Math.abs(a.delta) || a.label.localeCompare(b.label);
+}
+
+function createChangeHeadline(dimensions, emergingClusters) {
+  const strongestDimension = [...dimensions].sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0];
+  const topCluster = emergingClusters.find((cluster) => cluster.goalMatched) || emergingClusters[0];
+
+  if (!strongestDimension || strongestDimension.delta === 0) {
+    return topCluster
+      ? `Stable portfolio with more signal around ${topCluster.label}.`
+      : "Stable portfolio with no meaningful snapshot movement yet.";
+  }
+
+  const direction = strongestDimension.delta > 0 ? "increased" : "decreased";
+  const clusterNote = topCluster ? `; strongest emerging cluster is ${topCluster.label}` : "";
+  return `${strongestDimension.label} ${direction} by ${Math.abs(strongestDimension.delta)} points${clusterNote}.`;
 }

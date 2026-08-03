@@ -27,7 +27,7 @@
 
 - Build a longitudinal personality/feed map.
 - Show attention allocation, aspiration alignment, novelty, discipline, emotional load, and content clusters.
-- Add "what changed this week" summaries.
+- Add "what changed this week" summaries. The model now has a normalized snapshot comparison primitive; the remaining work is local history storage and UI presentation.
 
 ## Milestone 5: Agentic Coach
 
