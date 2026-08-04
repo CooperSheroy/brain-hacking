@@ -18,7 +18,7 @@
 ## Milestone 3: Official Integrations
 
 - Add backend OAuth callback handling and encrypted token vault wiring.
-- Extend the read-only OAuth adapter contract into platform API clients after token storage exists.
+- Extend the read-only OAuth adapter contract into platform API clients after token storage exists. The official read client boundary now enforces server-side vault access, least-privilege scopes, and read-only request handling for future production wiring.
 - Normalize imported follows, saves, likes, topics, and muted content.
 - Add clear permission controls and deletion/export.
 - Keep automation disabled unless allowed by platform terms.

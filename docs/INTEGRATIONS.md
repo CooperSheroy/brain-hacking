@@ -15,7 +15,7 @@ Provider catalog
   -> Feed/personality analysis
 ```
 
-The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, encrypted token vault primitives, normalized manual activity ingestion, provider activity normalization, and an import adapter contract. The missing production backend pieces are token exchange, persistent encrypted storage wiring, scheduled imports, and real provider API clients.
+The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, encrypted token vault primitives, normalized manual activity ingestion, provider activity normalization, an official read API client boundary, and an import adapter contract. The missing production backend pieces are token exchange, persistent encrypted storage wiring, scheduled imports, and provider-specific production hardening.
 
 ## Adapter Contract
 
@@ -39,6 +39,18 @@ Official API clients should translate platform payloads through `normalizeProvid
 - Raw platform payloads, access tokens, authorization codes, private message content, and unrecognized signal types are not accepted by the normalized activity boundary.
 
 This keeps future OAuth adapters focused on least-privilege read imports and makes unsupported or sensitive data fail closed.
+
+## Official Read Client Boundary
+
+`src/integrations/officialApiClient.js` defines the first backend-only API client seam for official social reads. It is intentionally small and test-injected:
+
+- It loads access tokens only through the server-side token vault.
+- It exposes declared read endpoints and their required scopes without leaking endpoint templates to the UI.
+- It refuses to fetch when the encrypted grant is expired or missing the endpoint's least-privilege scope.
+- It sends only `GET` requests, maps successful provider records through `normalizeProviderActivities`, and returns no token material.
+- It surfaces provider rate limits and errors as import failures instead of retrying or working around platform controls.
+
+This advances the OAuth/API roadmap while keeping real credential collection, scraping, and engagement automation out of scope.
 
 ## Portfolio Model Boundary
 
@@ -89,7 +101,7 @@ The same boundary now supports snapshot comparisons through `comparePortfolioMap
 
 1. Backend token exchange using the verified callback intake and encrypted token vault.
 2. Persistent encrypted token store plus disconnect/delete/export controls.
-3. Twitter/X read-only API client that maps official payloads through the normalized activity contract behind a feature flag.
+3. Wire the official read client to backend token exchange and a persistent encrypted store behind a feature flag.
 4. Local normalized activity store.
 5. Scheduled import worker with rate limiting and audit logs.
 6. Portfolio map generated from normalized activities.
