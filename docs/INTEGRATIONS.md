@@ -15,19 +15,20 @@ Provider catalog
   -> Feed/personality analysis
 ```
 
-The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, encrypted token vault primitives, normalized manual activity ingestion, provider activity normalization, an official read API client boundary, and an import adapter contract. The missing production backend pieces are token exchange, persistent encrypted storage wiring, scheduled imports, and provider-specific production hardening.
+The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, backend token exchange boundary, encrypted token vault primitives, normalized manual activity ingestion, provider activity normalization, an official read API client boundary, and an import adapter contract. The missing production backend pieces are a live token-exchange route with real server-side app configuration, persistent encrypted storage wiring, scheduled imports, and provider-specific production hardening.
 
 ## Adapter Contract
 
 Provider imports enter the product through `src/integrations/adapters.js`.
 
 - Manual import is the only adapter that can import activities today. It accepts user-supplied text and emits normalized local activities.
-- OAuth providers expose read-only adapter readiness, required scopes, guardrails, and blockers, but their import methods intentionally fail until backend OAuth token exchange is wired to the encrypted token vault and production controls.
+- OAuth providers expose read-only adapter readiness, required scopes, guardrails, and blockers, but their import methods intentionally fail until the tested token-exchange boundary is wrapped by a live backend route, persistent encrypted storage, and production controls.
 - Adapter guardrails explicitly prohibit password collection, browser token storage, and automated engagement.
 - The local server exposes `/api/oauth/authorization?provider=twitter` for backend-generated PKCE state and `/oauth/callback` for verified callback intake. The callback response stores no raw authorization code or token material.
 - `src/integrations/tokenVault.js` provides the backend-only encrypted token envelope primitive for future OAuth token exchange wiring. It has no public endpoint, accepts only least-privilege catalog scopes, and keeps raw tokens out of grant summaries and browser code.
+- `src/integrations/oauthTokenExchange.js` defines the server-only authorization-code exchange boundary. It requires verified PKCE state, injected server-side client configuration, an encrypted token vault, and an injected `fetch`; it returns only a grant summary and never raw authorization codes, client secrets, or tokens.
 
-This keeps UI and planner code adapter-oriented without implying that real social API access is available before official OAuth token exchange, persistent encrypted storage, disconnect controls, and import workers are built.
+This keeps UI and planner code adapter-oriented without implying that real social API access is available before the live token-exchange route, persistent encrypted storage, disconnect controls, and import workers are built.
 
 ## Normalized Activity Contract
 
@@ -51,6 +52,18 @@ This keeps future OAuth adapters focused on least-privilege read imports and mak
 - It surfaces provider rate limits and errors as import failures instead of retrying or working around platform controls.
 
 This advances the OAuth/API roadmap while keeping real credential collection, scraping, and engagement automation out of scope.
+
+## OAuth Token Exchange Boundary
+
+`src/integrations/oauthTokenExchange.js` is the first production-shaped seam between verified OAuth callbacks and encrypted token storage:
+
+- It posts authorization-code exchanges only to the provider's official token endpoint.
+- It requires the original PKCE code verifier and redirect URI from verified pending state.
+- It rejects placeholder client IDs/secrets so sample environment names cannot accidentally become credentials.
+- It persists token material only by calling the backend token vault and returns sanitized grant summaries.
+- It fails closed when providers return unsupported scopes, token errors, or malformed token payloads.
+
+This module is not exposed as a live route yet. The next production step is to wrap it in a backend endpoint that loads real server-side app configuration, persists vault records outside memory, and adds disconnect/delete/audit controls before scheduled API reads.
 
 ## Portfolio Model Boundary
 
@@ -99,9 +112,9 @@ The same boundary now supports snapshot comparisons through `comparePortfolioMap
 
 ## Production Milestones
 
-1. Backend token exchange using the verified callback intake and encrypted token vault.
+1. Live backend token-exchange route using verified callback intake, server-side app config, and encrypted token vault persistence.
 2. Persistent encrypted token store plus disconnect/delete/export controls.
-3. Wire the official read client to backend token exchange and a persistent encrypted store behind a feature flag.
+3. Wire the official read client to stored grants behind a feature flag.
 4. Local normalized activity store.
 5. Scheduled import worker with rate limiting and audit logs.
 6. Portfolio map generated from normalized activities.

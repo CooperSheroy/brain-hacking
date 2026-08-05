@@ -35,7 +35,8 @@ Provider OAuth
 - `src/integrations/adapters.js`: import adapter contract that allows local manual ingestion now and gates official OAuth imports behind backend token infrastructure.
 - `src/integrations/oauth.js`: OAuth PKCE state, consent summaries, and authorization request construction.
 - `src/integrations/oauthCallback.js`: server-side OAuth callback verification and no-token audit result shaping.
-- `src/integrations/tokenVault.js`: backend-only encrypted token grant envelopes for future official OAuth token exchange wiring.
+- `src/integrations/oauthTokenExchange.js`: server-only authorization-code exchange boundary that requires verified PKCE state and stores token material only through a token vault.
+- `src/integrations/tokenVault.js`: backend-only encrypted token grant envelopes for future persistent OAuth grant storage.
 - `src/integrations/normalizedActivity.js`: normalized activity primitives for manual imports and sanitized official provider records.
 - `src/app.js`: browser state management, view switching, rendering, and export.
 - `server.js`: no-framework local static server for development.

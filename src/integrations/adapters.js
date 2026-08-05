@@ -2,7 +2,8 @@ import { normalizeManualSignals, summarizeActivities } from "./normalizedActivit
 import { getProvider, getProviderIds, providerCatalog } from "./providers.js";
 
 const oauthImportBlockers = [
-  "backend OAuth token exchange wired to the encrypted token vault",
+  "live backend token-exchange route with server-side app configuration",
+  "persistent encrypted token store",
   "provider rate-limit handling",
   "user-visible disconnect and deletion controls"
 ];
@@ -74,7 +75,7 @@ function createOfficialOAuthAdapter(provider) {
     supportedSignals: [...provider.supportedSignals],
     requiredScopes: [...provider.defaultScopes],
     blockers: [...oauthImportBlockers],
-    nextRequiredStep: "Wire backend OAuth token exchange to the encrypted token vault before API imports.",
+    nextRequiredStep: "Wrap the tested token-exchange boundary in a live backend route with persistent encrypted storage.",
     guardrails: [
       "request least-privilege read scopes",
       "store tokens server-side only",
@@ -82,7 +83,7 @@ function createOfficialOAuthAdapter(provider) {
     ],
     importActivities() {
       throw new Error(
-        `${provider.label} imports require official OAuth token exchange and encrypted server-side token vault wiring first.`
+        `${provider.label} imports require a live OAuth token-exchange route and persistent encrypted token vault wiring first.`
       );
     }
   };

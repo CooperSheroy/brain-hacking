@@ -6,6 +6,7 @@ export const providerCatalog = [
     mode: "oauth-pkce",
     oauth: {
       authorizationUrl: "https://twitter.com/i/oauth2/authorize",
+      tokenUrl: "https://api.twitter.com/2/oauth2/token",
       clientIdPlaceholder: "TWITTER_CLIENT_ID"
     },
     defaultScopes: ["tweet.read", "users.read", "offline.access"],
@@ -38,7 +39,9 @@ export const providerCatalog = [
     mode: "oauth-pkce",
     oauth: {
       authorizationUrl: "https://api.instagram.com/oauth/authorize",
-      clientIdPlaceholder: "INSTAGRAM_CLIENT_ID"
+      tokenUrl: "https://api.instagram.com/oauth/access_token",
+      clientIdPlaceholder: "INSTAGRAM_CLIENT_ID",
+      clientSecretPlaceholder: "INSTAGRAM_CLIENT_SECRET"
     },
     defaultScopes: ["user_profile", "user_media"],
     supportedSignals: ["profile", "media captions", "creator clusters"],
@@ -64,7 +67,9 @@ export const providerCatalog = [
     mode: "oauth-pkce",
     oauth: {
       authorizationUrl: "https://www.facebook.com/v20.0/dialog/oauth",
-      clientIdPlaceholder: "FACEBOOK_CLIENT_ID"
+      tokenUrl: "https://graph.facebook.com/v20.0/oauth/access_token",
+      clientIdPlaceholder: "FACEBOOK_CLIENT_ID",
+      clientSecretPlaceholder: "FACEBOOK_CLIENT_SECRET"
     },
     defaultScopes: ["public_profile"],
     supportedSignals: ["profile", "page interests"],

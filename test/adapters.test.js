@@ -21,12 +21,12 @@ test("manual adapter imports user-provided local text", () => {
   assert.equal(result.summary.byType.topic, 2);
 });
 
-test("official OAuth adapters are capability-gated until backend token handling exists", () => {
+test("official OAuth adapters are capability-gated until live backend token handling exists", () => {
   const adapter = getImportAdapter("twitter");
   const readiness = summarizeAdapterReadiness("twitter");
 
   assert.equal(adapter.canImportNow, false);
   assert.equal(readiness.importMode, "official OAuth read import");
   assert.ok(readiness.guardrails.some((guardrail) => guardrail.includes("least-privilege")));
-  assert.throws(() => adapter.importActivities(), /token vault wiring/u);
+  assert.throws(() => adapter.importActivities(), /live OAuth token-exchange route/u);
 });
