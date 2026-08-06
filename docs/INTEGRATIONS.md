@@ -49,6 +49,7 @@ This keeps future OAuth adapters focused on least-privilege read imports and mak
 - It exposes declared read endpoints and their required scopes without leaking endpoint templates to the UI.
 - It refuses to fetch when the encrypted grant is expired or missing the endpoint's least-privilege scope.
 - It sends only `GET` requests, maps successful provider records through `normalizeProviderActivities`, and returns no token material.
+- It returns adapter-ready import metadata, required-scope provenance, normalized activity summaries, and activities in the same shape that portfolio snapshots consume.
 - It surfaces provider rate limits and errors as import failures instead of retrying or working around platform controls.
 
 This advances the OAuth/API roadmap while keeping real credential collection, scraping, and engagement automation out of scope.

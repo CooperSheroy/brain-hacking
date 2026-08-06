@@ -1,4 +1,4 @@
-import { normalizeProviderActivities } from "./normalizedActivity.js";
+import { normalizeProviderActivities, summarizeActivities } from "./normalizedActivity.js";
 import { getProvider } from "./providers.js";
 
 const readEndpointCatalog = {
@@ -104,8 +104,12 @@ export function createOfficialReadClient({
         providerId: provider.id,
         accountId: normalizedAccountId,
         endpointId: endpoint.id,
+        importMode: "official OAuth read import",
+        requiredScope: endpoint.scope,
+        signalType: endpoint.signalType,
         importedAt: new Date(now()).toISOString(),
-        activities
+        activities,
+        summary: summarizeActivities(activities)
       };
     }
   };

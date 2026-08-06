@@ -73,6 +73,12 @@ test("official read client imports provider data through vault-backed read reque
   assert.equal(capturedRequest.url, "https://api.twitter.com/2/users/user-123/liked_tweets?limit=10");
   assert.equal(capturedRequest.init.method, "GET");
   assert.equal(capturedRequest.init.headers.authorization, "Bearer server-side-access-token");
+  assert.equal(result.importMode, "official OAuth read import");
+  assert.equal(result.requiredScope, "tweet.read");
+  assert.equal(result.signalType, "likes");
+  assert.equal(result.summary.total, 1);
+  assert.equal(result.summary.bySource.twitter, 1);
+  assert.equal(result.summary.byType.like, 1);
   assert.deepEqual(result.activities, [
     {
       id: "twitter-tweet-1",
