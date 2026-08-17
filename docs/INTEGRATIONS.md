@@ -15,7 +15,7 @@ Provider catalog
   -> Feed/personality analysis
 ```
 
-The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, backend token exchange boundary, encrypted token vault primitives, normalized manual activity ingestion, provider activity normalization, an official read API client boundary, and an import adapter contract. The missing production backend pieces are a live token-exchange route with real server-side app configuration, persistent encrypted storage wiring, scheduled imports, and provider-specific production hardening.
+The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, backend token exchange boundary, encrypted token vault primitives, file-backed encrypted grant persistence, normalized manual activity ingestion, provider activity normalization, an official read API client boundary, and an import adapter contract. The missing production backend pieces are a live token-exchange route with real server-side app configuration, route-level persistent storage wiring, scheduled imports, and provider-specific production hardening.
 
 ## Adapter Contract
 
@@ -26,6 +26,7 @@ Provider imports enter the product through `src/integrations/adapters.js`.
 - Adapter guardrails explicitly prohibit password collection, browser token storage, and automated engagement.
 - The local server exposes `/api/oauth/authorization?provider=twitter` for backend-generated PKCE state and `/oauth/callback` for verified callback intake. The callback response stores no raw authorization code or token material.
 - `src/integrations/tokenVault.js` provides the backend-only encrypted token envelope primitive for future OAuth token exchange wiring. It has no public endpoint, accepts only least-privilege catalog scopes, and keeps raw tokens out of grant summaries and browser code.
+- `src/integrations/tokenGrantStore.js` provides a file-backed persistence adapter for those encrypted envelopes. It stores only vault records, validates the store format on load, and updates the file through atomic replacement.
 - `src/integrations/oauthTokenExchange.js` defines the server-only authorization-code exchange boundary. It requires verified PKCE state, injected server-side client configuration, an encrypted token vault, and an injected `fetch`; it returns only a grant summary and never raw authorization codes, client secrets, or tokens.
 
 This keeps UI and planner code adapter-oriented without implying that real social API access is available before the live token-exchange route, persistent encrypted storage, disconnect controls, and import workers are built.
@@ -64,7 +65,7 @@ This advances the OAuth/API roadmap while keeping real credential collection, sc
 - It persists token material only by calling the backend token vault and returns sanitized grant summaries.
 - It fails closed when providers return unsupported scopes, token errors, or malformed token payloads.
 
-This module is not exposed as a live route yet. The next production step is to wrap it in a backend endpoint that loads real server-side app configuration, persists vault records outside memory, and adds disconnect/delete/audit controls before scheduled API reads.
+This module is not exposed as a live route yet. The repository now has a file-backed encrypted grant store for the vault, so the next production step is to wrap the exchange boundary in a backend endpoint that loads real server-side app configuration, wires the persistent store at route level, and adds disconnect/delete/audit controls before scheduled API reads.
 
 ## Portfolio Model Boundary
 
@@ -114,7 +115,7 @@ The same boundary now supports snapshot comparisons through `comparePortfolioMap
 ## Production Milestones
 
 1. Live backend token-exchange route using verified callback intake, server-side app config, and encrypted token vault persistence.
-2. Persistent encrypted token store plus disconnect/delete/export controls.
+2. Disconnect/delete/export controls over persisted encrypted grants.
 3. Wire the official read client to stored grants behind a feature flag.
 4. Local normalized activity store.
 5. Scheduled import worker with rate limiting and audit logs.

@@ -2,8 +2,7 @@ import { normalizeManualSignals, summarizeActivities } from "./normalizedActivit
 import { getProvider, getProviderIds, providerCatalog } from "./providers.js";
 
 const oauthImportBlockers = [
-  "live backend token-exchange route with server-side app configuration",
-  "persistent encrypted token store",
+  "live backend token-exchange route with server-side app configuration and persistent encrypted storage",
   "provider rate-limit handling",
   "user-visible disconnect and deletion controls"
 ];
@@ -75,7 +74,7 @@ function createOfficialOAuthAdapter(provider) {
     supportedSignals: [...provider.supportedSignals],
     requiredScopes: [...provider.defaultScopes],
     blockers: [...oauthImportBlockers],
-    nextRequiredStep: "Wrap the tested token-exchange boundary in a live backend route with persistent encrypted storage.",
+    nextRequiredStep: "Wrap the tested token-exchange boundary and persistent grant store in a live backend route.",
     guardrails: [
       "request least-privilege read scopes",
       "store tokens server-side only",
