@@ -112,5 +112,5 @@ test("token vault readiness documents remaining production wiring", () => {
 
   assert.equal(readiness.status, "backend-primitive-ready");
   assert.equal(readiness.storage, "encrypted server-side token envelopes");
-  assert.ok(readiness.remainingBeforeImports.includes("live token-exchange route"));
+  assert.ok(readiness.remainingBeforeImports.includes("disconnect/delete/export API"));
 });

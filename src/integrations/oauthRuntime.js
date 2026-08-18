@@ -1,0 +1,80 @@
+import { join, resolve } from "node:path";
+import { getProvider } from "./providers.js";
+import { createFileTokenGrantStore } from "./tokenGrantStore.js";
+import { createInMemoryTokenVault } from "./tokenVault.js";
+
+const vaultKeyEnv = "BRAIN_HACKING_TOKEN_VAULT_KEY";
+const grantStorePathEnv = "BRAIN_HACKING_TOKEN_GRANT_STORE";
+
+export function createServerOAuthRuntime({
+  env = process.env,
+  rootDir = process.cwd(),
+  fetchImpl = globalThis.fetch,
+  now = Date.now,
+  tokenVault,
+  randomBytes
+} = {}) {
+  let cachedVault = tokenVault || null;
+
+  return {
+    fetchImpl,
+    now,
+
+    loadTokenVault() {
+      if (cachedVault) {
+        return cachedVault;
+      }
+
+      const encryptionKey = readRequiredEnv(env, vaultKeyEnv);
+      cachedVault = createInMemoryTokenVault({
+        encryptionKey,
+        store: createFileTokenGrantStore({ filePath: resolveGrantStorePath(env, rootDir) }),
+        now,
+        ...(randomBytes ? { randomBytes } : {})
+      });
+      return cachedVault;
+    },
+
+    getClientConfig(providerId) {
+      const provider = getProvider(providerId);
+      if (provider.mode !== "oauth-pkce") {
+        throw new Error(`${provider.label} does not use OAuth token exchange.`);
+      }
+
+      const config = {
+        clientId: readRequiredEnv(env, provider.oauth.clientIdPlaceholder)
+      };
+      if (provider.oauth.clientSecretPlaceholder) {
+        config.clientSecret = readRequiredEnv(env, provider.oauth.clientSecretPlaceholder);
+      }
+      return config;
+    }
+  };
+}
+
+export function summarizeServerOAuthRuntime(env = process.env, rootDir = process.cwd()) {
+  return {
+    status: env[vaultKeyEnv] ? "configured" : "requires-server-configuration",
+    requiredEnv: [vaultKeyEnv],
+    optionalEnv: [grantStorePathEnv],
+    grantStorePath: resolveGrantStorePath(env, rootDir),
+    guardrails: [
+      "load OAuth client configuration only from server environment variables",
+      "persist token grants as encrypted server-side envelopes",
+      "do not expose authorization codes, client secrets, or tokens in route responses"
+    ]
+  };
+}
+
+function readRequiredEnv(env, name) {
+  const value = String(env?.[name] || "").trim();
+  if (!value) {
+    throw new Error(`OAuth token exchange route requires server environment variable ${name}.`);
+  }
+  return value;
+}
+
+function resolveGrantStorePath(env, rootDir) {
+  const configured = String(env?.[grantStorePathEnv] || "").trim();
+  return configured ? resolve(configured) : join(rootDir, ".brain-hacking", "oauth-grants.json");
+}

@@ -74,10 +74,10 @@ test("file token grant store rejects unsupported persisted formats", async () =>
   }
 });
 
-test("file token grant store readiness keeps imports gated behind live backend wiring", () => {
+test("file token grant store readiness keeps imports gated behind user controls", () => {
   const readiness = summarizeTokenGrantStoreReadiness();
 
   assert.equal(readiness.status, "persistent-store-primitive-ready");
   assert.ok(readiness.guardrails.some((guardrail) => guardrail.includes("vault-encrypted")));
-  assert.ok(readiness.remainingBeforeImports.includes("live token-exchange route"));
+  assert.ok(readiness.remainingBeforeImports.includes("disconnect/delete/export API"));
 });

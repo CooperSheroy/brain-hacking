@@ -2,9 +2,11 @@ import { normalizeManualSignals, summarizeActivities } from "./normalizedActivit
 import { getProvider, getProviderIds, providerCatalog } from "./providers.js";
 
 const oauthImportBlockers = [
-  "live backend token-exchange route with server-side app configuration and persistent encrypted storage",
+  "user-visible disconnect, deletion, and export controls for stored grants",
+  "audit logging for consent, import, and account-disconnect events",
+  "feature-flagged import worker that reads through the official API client",
   "provider rate-limit handling",
-  "user-visible disconnect and deletion controls"
+  "provider-specific production permission review"
 ];
 
 const prohibitedActions = [
@@ -74,7 +76,7 @@ function createOfficialOAuthAdapter(provider) {
     supportedSignals: [...provider.supportedSignals],
     requiredScopes: [...provider.defaultScopes],
     blockers: [...oauthImportBlockers],
-    nextRequiredStep: "Wrap the tested token-exchange boundary and persistent grant store in a live backend route.",
+    nextRequiredStep: "Add disconnect/delete/export controls and audit logging before enabling stored-grant imports.",
     guardrails: [
       "request least-privilege read scopes",
       "store tokens server-side only",
@@ -82,7 +84,7 @@ function createOfficialOAuthAdapter(provider) {
     ],
     importActivities() {
       throw new Error(
-        `${provider.label} imports require a live OAuth token-exchange route and persistent encrypted token vault wiring first.`
+        `${provider.label} imports require disconnect/delete/export controls, audit logging, and a feature-flagged official API import worker first.`
       );
     }
   };

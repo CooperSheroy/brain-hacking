@@ -5,6 +5,8 @@ import { readFile } from "node:fs/promises";
 import { getProvider } from "./src/integrations/providers.js";
 import { buildAuthorizationRequest, createOAuthState, summarizeConsent } from "./src/integrations/oauth.js";
 import { parseOAuthCallback } from "./src/integrations/oauthCallback.js";
+import { exchangeAuthorizationCodeForGrant } from "./src/integrations/oauthTokenExchange.js";
+import { createServerOAuthRuntime, summarizeServerOAuthRuntime } from "./src/integrations/oauthRuntime.js";
 
 const root = process.cwd();
 const port = Number(process.env.PORT || 4175);
@@ -22,6 +24,14 @@ export function createRequestHandler(options = {}) {
   const rootDir = options.rootDir || root;
   const stateStore = options.stateStore || pendingOAuthStates;
   const now = options.now || Date.now;
+  const oauthRuntime =
+    options.oauthRuntime ||
+    createServerOAuthRuntime({
+      env: options.env || process.env,
+      rootDir,
+      fetchImpl: options.fetchImpl || globalThis.fetch,
+      now
+    });
 
   return async function handleRequest(req, res) {
     const requestUrl = req.url || "/";
@@ -30,6 +40,16 @@ export function createRequestHandler(options = {}) {
     try {
       if (parsed.pathname === "/api/oauth/authorization") {
         await handleOAuthAuthorization(parsed, res, stateStore, now);
+        return;
+      }
+
+      if (parsed.pathname === "/api/oauth/token-exchange") {
+        await handleOAuthTokenExchange(req, res, stateStore, oauthRuntime, now);
+        return;
+      }
+
+      if (parsed.pathname === "/api/oauth/runtime") {
+        sendJson(res, 200, summarizeServerOAuthRuntime(options.env || process.env, rootDir));
         return;
       }
 
@@ -109,6 +129,84 @@ function handleOAuthCallback(requestUrl, res, stateStore, now) {
     stateStore.delete(result.stateNonce);
   }
   sendJson(res, result.ok ? 200 : 400, result);
+}
+
+async function handleOAuthTokenExchange(req, res, stateStore, oauthRuntime, now) {
+  if (req.method !== "POST") {
+    throw new Error("OAuth token exchange route requires POST.");
+  }
+
+  const payload = await readJsonBody(req);
+  const stateNonce = normalizeRouteValue(payload.stateNonce || payload.state, "OAuth state nonce");
+  const authorizationCode = normalizeRouteValue(payload.authorizationCode || payload.code, "OAuth authorization code");
+  const accountId = normalizeRouteValue(payload.accountId, "OAuth account id");
+  const pendingState = stateStore.get(stateNonce);
+
+  if (!pendingState) {
+    throw new Error("OAuth callback state could not be verified.");
+  }
+  if (payload.providerId && payload.providerId !== pendingState.providerId) {
+    throw new Error(`OAuth token exchange provider ${payload.providerId} does not match pending state.`);
+  }
+
+  const callbackAudit = parseOAuthCallback(
+    `/oauth/callback?code=${encodeURIComponent(authorizationCode)}&state=${encodeURIComponent(stateNonce)}`,
+    stateStore.values(),
+    { now }
+  );
+  const exchange = await exchangeAuthorizationCodeForGrant({
+    providerId: pendingState.providerId,
+    accountId,
+    authorizationCode,
+    oauthState: pendingState,
+    tokenVault: oauthRuntime.loadTokenVault(),
+    clientConfig: oauthRuntime.getClientConfig(pendingState.providerId),
+    fetchImpl: oauthRuntime.fetchImpl,
+    now
+  });
+
+  stateStore.delete(stateNonce);
+  sendJson(res, 200, {
+    ok: true,
+    status: "token-exchange-complete",
+    providerId: exchange.providerId,
+    accountId: exchange.accountId,
+    callback: callbackAudit,
+    exchange,
+    guardrails: [
+      "authorization code was consumed by the backend route",
+      "token material was persisted only through the encrypted vault",
+      "response contains only sanitized grant metadata"
+    ]
+  });
+}
+
+async function readJsonBody(req) {
+  let body = "";
+  for await (const chunk of req) {
+    body += chunk;
+    if (body.length > 8192) {
+      throw new Error("OAuth token exchange request body is too large.");
+    }
+  }
+
+  if (!body.trim()) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new Error("OAuth token exchange request body must be JSON.");
+  }
+}
+
+function normalizeRouteValue(value, label) {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    throw new Error(`${label} is required.`);
+  }
+  return normalized;
 }
 
 async function nodeSha256Digest(bytes) {

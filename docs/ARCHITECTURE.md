@@ -36,6 +36,7 @@ Provider OAuth
 - `src/integrations/oauth.js`: OAuth PKCE state, consent summaries, and authorization request construction.
 - `src/integrations/oauthCallback.js`: server-side OAuth callback verification and no-token audit result shaping.
 - `src/integrations/oauthTokenExchange.js`: server-only authorization-code exchange boundary that requires verified PKCE state and stores token material only through a token vault.
+- `src/integrations/oauthRuntime.js`: server runtime wiring for OAuth client configuration, encrypted file-backed grant storage, and no-secret readiness summaries.
 - `src/integrations/tokenVault.js`: backend-only encrypted token grant envelopes for future persistent OAuth grant storage.
 - `src/integrations/tokenGrantStore.js`: file-backed persistence for encrypted OAuth grant envelopes, designed to sit behind the backend token vault.
 - `src/integrations/normalizedActivity.js`: normalized activity primitives for manual imports and sanitized official provider records.
@@ -46,7 +47,7 @@ Provider OAuth
 
 The MVP only processes text the user manually provides in the browser. No remote API calls are made. Manual text is first converted into normalized local activity records, then the portfolio model reads those records through the same boundary planned for official integrations.
 
-The integration foundation can construct OAuth authorization requests, verify callback state on the local Node server, encrypt token grant envelopes for backend storage, and persist those encrypted envelopes in a server-side file store. It does not expose a live token-exchange route, collect production credentials, or call provider APIs. Token exchange and storage wiring must live in a backend service, not in the static browser UI.
+The integration foundation can construct OAuth authorization requests, verify callback state on the local Node server, exchange authorization codes in a server-only route, encrypt token grant envelopes for backend storage, and persist those encrypted envelopes in a server-side file store. It does not collect production credentials in the browser or call provider APIs from the static UI. Token exchange and storage wiring live in the backend service.
 
 For the long-term version, every platform connector needs:
 

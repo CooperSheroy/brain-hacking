@@ -46,10 +46,10 @@ export function summarizeTokenGrantStoreReadiness() {
       "uses atomic file replacement for grant updates"
     ],
     remainingBeforeImports: [
-      "live token-exchange route",
-      "server-side runtime configuration",
-      "disconnect/delete API",
-      "rate-limit and audit-log wiring"
+      "disconnect/delete/export API",
+      "audit-log wiring",
+      "feature-flagged import worker",
+      "rate-limit handling"
     ]
   };
 }
