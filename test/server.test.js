@@ -105,6 +105,71 @@ test("server exchanges verified OAuth callbacks through backend vault wiring", a
   }
 });
 
+test("server exposes sanitized OAuth grant list, export, and disconnect controls", async () => {
+  const vault = createInMemoryTokenVault({
+    encryptionKey: new Uint8Array(32).fill(10),
+    now: () => Date.parse("2026-08-19T04:10:00.000Z"),
+    randomBytes: (length) => new Uint8Array(length).fill(6)
+  });
+  vault.saveGrant({
+    providerId: "twitter",
+    accountId: "user-123",
+    scopes: ["tweet.read", "users.read"],
+    tokenSet: {
+      accessToken: "server-side-access-token",
+      refreshToken: "server-side-refresh-token",
+      tokenType: "Bearer",
+      expiresAt: "2026-08-19T05:10:00.000Z"
+    }
+  });
+
+  const server = createServer(
+    createRequestHandler({
+      now: () => Date.parse("2026-08-19T04:10:00.000Z"),
+      oauthRuntime: {
+        fetchImpl: async () => {
+          throw new Error("fetch should not run");
+        },
+        loadTokenVault: () => vault,
+        getClientConfig: () => ({ clientId: "client-123" })
+      }
+    })
+  );
+  await listen(server);
+
+  try {
+    const baseUrl = `http://127.0.0.1:${server.address().port}`;
+    const listResponse = await fetch(`${baseUrl}/api/oauth/grants?provider=twitter`);
+    const listing = await listResponse.json();
+    const exportResponse = await fetch(`${baseUrl}/api/oauth/grants/export`);
+    const exported = await exportResponse.json();
+    const deleteResponse = await fetch(`${baseUrl}/api/oauth/grants`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ providerId: "twitter", accountId: "user-123" })
+    });
+    const disconnected = await deleteResponse.json();
+    const emptyResponse = await fetch(`${baseUrl}/api/oauth/grants`);
+    const empty = await emptyResponse.json();
+
+    assert.equal(listResponse.status, 200);
+    assert.equal(listing.status, "oauth-grant-list-ready");
+    assert.equal(listing.grants.length, 1);
+    assert.equal(listing.grants[0].accountId, "user-123");
+    assert.equal(exportResponse.status, 200);
+    assert.equal(exported.status, "oauth-grant-export-ready");
+    assert.equal(JSON.stringify(exported).includes("server-side-access-token"), false);
+    assert.equal(JSON.stringify(exported).includes("server-side-refresh-token"), false);
+    assert.equal(deleteResponse.status, 200);
+    assert.equal(disconnected.status, "oauth-grant-disconnected");
+    assert.equal(disconnected.deleted, true);
+    assert.equal(emptyResponse.status, 200);
+    assert.deepEqual(empty.grants, []);
+  } finally {
+    await close(server);
+  }
+});
+
 test("server rejects OAuth callbacks that lack server-created state", async () => {
   const server = createServer(createRequestHandler({ stateStore: new Map() }));
   await listen(server);

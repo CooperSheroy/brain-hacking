@@ -17,7 +17,7 @@
 
 ## Milestone 3: Official Integrations
 
-- Add backend OAuth callback handling and encrypted token vault wiring. A server-only token exchange route now validates PKCE state, loads server-side app configuration, calls official token endpoints through injected fetch, and stores token material only through the encrypted vault with file-backed persistence. The remaining work is disconnect/delete/export controls, audit logs, and production import workers.
+- Add backend OAuth callback handling and encrypted token vault wiring. A server-only token exchange route now validates PKCE state, loads server-side app configuration, calls official token endpoints through injected fetch, and stores token material only through the encrypted vault with file-backed persistence. Server-side grant controls can list/export sanitized metadata and disconnect stored grants. The remaining work is audit logs, rate-limit handling, and production import workers.
 - Extend the read-only OAuth adapter contract into platform API clients after token storage exists. The official read client boundary now enforces server-side vault access, least-privilege scopes, and read-only request handling for future production wiring.
 - Normalize imported follows, saves, likes, topics, and muted content.
 - Add clear permission controls and deletion/export.

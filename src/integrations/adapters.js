@@ -2,7 +2,6 @@ import { normalizeManualSignals, summarizeActivities } from "./normalizedActivit
 import { getProvider, getProviderIds, providerCatalog } from "./providers.js";
 
 const oauthImportBlockers = [
-  "user-visible disconnect, deletion, and export controls for stored grants",
   "audit logging for consent, import, and account-disconnect events",
   "feature-flagged import worker that reads through the official API client",
   "provider rate-limit handling",
@@ -76,7 +75,7 @@ function createOfficialOAuthAdapter(provider) {
     supportedSignals: [...provider.supportedSignals],
     requiredScopes: [...provider.defaultScopes],
     blockers: [...oauthImportBlockers],
-    nextRequiredStep: "Add disconnect/delete/export controls and audit logging before enabling stored-grant imports.",
+    nextRequiredStep: "Add audit logging and a feature-flagged official API import worker before enabling stored-grant imports.",
     guardrails: [
       "request least-privilege read scopes",
       "store tokens server-side only",
@@ -84,7 +83,7 @@ function createOfficialOAuthAdapter(provider) {
     ],
     importActivities() {
       throw new Error(
-        `${provider.label} imports require disconnect/delete/export controls, audit logging, and a feature-flagged official API import worker first.`
+        `${provider.label} imports require audit logging, rate-limit handling, production permission review, and a feature-flagged official API import worker first.`
       );
     }
   };

@@ -7,6 +7,11 @@ import { buildAuthorizationRequest, createOAuthState, summarizeConsent } from ".
 import { parseOAuthCallback } from "./src/integrations/oauthCallback.js";
 import { exchangeAuthorizationCodeForGrant } from "./src/integrations/oauthTokenExchange.js";
 import { createServerOAuthRuntime, summarizeServerOAuthRuntime } from "./src/integrations/oauthRuntime.js";
+import {
+  disconnectOAuthGrant,
+  exportOAuthGrantSummaries,
+  listOAuthGrantSummaries
+} from "./src/integrations/oauthGrantControls.js";
 
 const root = process.cwd();
 const port = Number(process.env.PORT || 4175);
@@ -53,6 +58,16 @@ export function createRequestHandler(options = {}) {
         return;
       }
 
+      if (parsed.pathname === "/api/oauth/grants") {
+        await handleOAuthGrants(req, parsed, res, oauthRuntime, now);
+        return;
+      }
+
+      if (parsed.pathname === "/api/oauth/grants/export") {
+        handleOAuthGrantExport(parsed, res, oauthRuntime, now);
+        return;
+      }
+
       if (parsed.pathname === "/oauth/callback") {
         handleOAuthCallback(requestUrl, res, stateStore, now);
         return;
@@ -82,6 +97,59 @@ function resolvePathForRoot(url, rootDir) {
     return join(rootDir, "index.html");
   }
   return join(rootDir, clean);
+}
+
+async function handleOAuthGrants(req, url, res, oauthRuntime, now) {
+  if (req.method === "GET") {
+    const providerId = url.searchParams.get("provider") || undefined;
+    sendJson(
+      res,
+      200,
+      listOAuthGrantSummaries({
+        tokenVault: oauthRuntime.loadTokenVault(),
+        providerId
+      })
+    );
+    return;
+  }
+
+  if (req.method === "DELETE") {
+    const payload = await readJsonBody(req);
+    const providerId = normalizeRouteValue(
+      payload.providerId || url.searchParams.get("provider"),
+      "OAuth provider id"
+    );
+    const accountId = normalizeRouteValue(
+      payload.accountId || url.searchParams.get("account_id") || url.searchParams.get("accountId"),
+      "OAuth account id"
+    );
+    sendJson(
+      res,
+      200,
+      disconnectOAuthGrant({
+        tokenVault: oauthRuntime.loadTokenVault(),
+        providerId,
+        accountId,
+        now
+      })
+    );
+    return;
+  }
+
+  throw new Error("OAuth grant controls route requires GET or DELETE.");
+}
+
+function handleOAuthGrantExport(url, res, oauthRuntime, now) {
+  const providerId = url.searchParams.get("provider") || undefined;
+  sendJson(
+    res,
+    200,
+    exportOAuthGrantSummaries({
+      tokenVault: oauthRuntime.loadTokenVault(),
+      providerId,
+      now
+    })
+  );
 }
 
 async function handleOAuthAuthorization(url, res, stateStore, now) {
@@ -186,7 +254,7 @@ async function readJsonBody(req) {
   for await (const chunk of req) {
     body += chunk;
     if (body.length > 8192) {
-      throw new Error("OAuth token exchange request body is too large.");
+      throw new Error("OAuth request body is too large.");
     }
   }
 
@@ -197,7 +265,7 @@ async function readJsonBody(req) {
   try {
     return JSON.parse(body);
   } catch {
-    throw new Error("OAuth token exchange request body must be JSON.");
+    throw new Error("OAuth request body must be JSON.");
   }
 }
 
