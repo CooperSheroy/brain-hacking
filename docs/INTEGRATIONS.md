@@ -15,7 +15,7 @@ Provider catalog
   -> Feed/personality analysis
 ```
 
-The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, a backend token exchange route, server-side runtime configuration, encrypted token vault primitives, file-backed encrypted grant persistence, server-side grant list/export/disconnect controls, normalized manual activity ingestion, provider activity normalization, an official read API client boundary, and an import adapter contract. The missing production backend pieces are audit logging, scheduled imports, rate-limit handling, and provider-specific production hardening.
+The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, a backend token exchange route, server-side runtime configuration, encrypted token vault primitives, file-backed encrypted grant persistence, sanitized OAuth audit logging, server-side grant list/export/disconnect controls, normalized manual activity ingestion, provider activity normalization, an official read API client boundary, and an import adapter contract. The missing production backend pieces are scheduled imports, rate-limit handling, and provider-specific production hardening.
 
 ## Adapter Contract
 
@@ -27,6 +27,7 @@ Provider imports enter the product through `src/integrations/adapters.js`.
 - The local server exposes `/api/oauth/authorization?provider=twitter` for backend-generated PKCE state, `/oauth/callback` for verified callback intake, `/api/oauth/token-exchange` for server-side authorization-code exchange, and `/api/oauth/runtime` for sanitized backend readiness. The callback response stores no raw authorization code or token material.
 - `src/integrations/tokenVault.js` provides the backend-only encrypted token envelope primitive for future OAuth token exchange wiring. It has no public endpoint, accepts only least-privilege catalog scopes, and keeps raw tokens out of grant summaries and browser code.
 - `src/integrations/tokenGrantStore.js` provides a file-backed persistence adapter for those encrypted envelopes. It stores only vault records, validates the store format on load, and updates the file through atomic replacement.
+- `src/integrations/oauthAuditLog.js` provides an append-only server-side audit event log for OAuth consent, callback, token exchange, grant export/disconnect/list, and official read attempts. It rejects token-like fields before persistence.
 - `src/integrations/oauthGrantControls.js` provides server-side grant controls for listing sanitized grants, exporting metadata-only grant summaries, and disconnecting accounts by deleting encrypted stored grants.
 - `src/integrations/oauthTokenExchange.js` defines the server-only authorization-code exchange boundary. It requires verified PKCE state, injected server-side client configuration, an encrypted token vault, and an injected `fetch`; it returns only a grant summary and never raw authorization codes, client secrets, or tokens.
 - `src/integrations/oauthRuntime.js` wires that boundary to server environment variables, a file-backed encrypted grant store, and no-secret readiness summaries.
@@ -67,7 +68,7 @@ This advances the OAuth/API roadmap while keeping real credential collection, sc
 - It persists token material only by calling the backend token vault and returns sanitized grant summaries.
 - It fails closed when providers return unsupported scopes, token errors, or malformed token payloads.
 
-This module is now exposed through `/api/oauth/token-exchange` behind server-side runtime configuration. The route consumes verified PKCE state, loads OAuth client IDs/secrets from environment variables, persists grants through the encrypted vault and file store, and returns only sanitized summaries. The next production step is to add audit logs before scheduled API reads.
+This module is now exposed through `/api/oauth/token-exchange` behind server-side runtime configuration. The route consumes verified PKCE state, loads OAuth client IDs/secrets from environment variables, persists grants through the encrypted vault and file store, records sanitized audit events, and returns only sanitized summaries. The next production step is to add a feature-flagged import worker with rate-limit handling before scheduled API reads.
 
 ## OAuth Grant Controls
 
@@ -127,9 +128,8 @@ The same boundary now supports snapshot comparisons through `comparePortfolioMap
 
 ## Production Milestones
 
-1. Audit logs for consent, export, disconnect, and import events.
-2. Wire the official read client to stored grants behind a feature flag.
-3. Local normalized activity store.
-4. Scheduled import worker with rate limiting.
-5. Portfolio map generated from normalized activities.
-6. Instagram/Facebook feasibility spikes based on official API limits.
+1. Wire the official read client to stored grants behind a feature flag.
+2. Local normalized activity store.
+3. Scheduled import worker with rate limiting.
+4. Portfolio map generated from normalized activities.
+5. Instagram/Facebook feasibility spikes based on official API limits.

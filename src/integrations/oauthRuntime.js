@@ -1,10 +1,12 @@
 import { join, resolve } from "node:path";
+import { createFileOAuthAuditLog } from "./oauthAuditLog.js";
 import { getProvider } from "./providers.js";
 import { createFileTokenGrantStore } from "./tokenGrantStore.js";
 import { createInMemoryTokenVault } from "./tokenVault.js";
 
 const vaultKeyEnv = "BRAIN_HACKING_TOKEN_VAULT_KEY";
 const grantStorePathEnv = "BRAIN_HACKING_TOKEN_GRANT_STORE";
+const auditLogPathEnv = "BRAIN_HACKING_OAUTH_AUDIT_LOG";
 
 export function createServerOAuthRuntime({
   env = process.env,
@@ -12,9 +14,11 @@ export function createServerOAuthRuntime({
   fetchImpl = globalThis.fetch,
   now = Date.now,
   tokenVault,
+  auditLog,
   randomBytes
 } = {}) {
   let cachedVault = tokenVault || null;
+  let cachedAuditLog = auditLog || null;
 
   return {
     fetchImpl,
@@ -33,6 +37,18 @@ export function createServerOAuthRuntime({
         ...(randomBytes ? { randomBytes } : {})
       });
       return cachedVault;
+    },
+
+    loadAuditLog() {
+      if (cachedAuditLog) {
+        return cachedAuditLog;
+      }
+
+      cachedAuditLog = createFileOAuthAuditLog({
+        filePath: resolveAuditLogPath(env, rootDir),
+        now
+      });
+      return cachedAuditLog;
     },
 
     getClientConfig(providerId) {
@@ -56,11 +72,13 @@ export function summarizeServerOAuthRuntime(env = process.env, rootDir = process
   return {
     status: env[vaultKeyEnv] ? "configured" : "requires-server-configuration",
     requiredEnv: [vaultKeyEnv],
-    optionalEnv: [grantStorePathEnv],
+    optionalEnv: [grantStorePathEnv, auditLogPathEnv],
     grantStorePath: resolveGrantStorePath(env, rootDir),
+    auditLogPath: resolveAuditLogPath(env, rootDir),
     guardrails: [
       "load OAuth client configuration only from server environment variables",
       "persist token grants as encrypted server-side envelopes",
+      "record sanitized OAuth audit events without token material",
       "do not expose authorization codes, client secrets, or tokens in route responses"
     ]
   };
@@ -77,4 +95,9 @@ function readRequiredEnv(env, name) {
 function resolveGrantStorePath(env, rootDir) {
   const configured = String(env?.[grantStorePathEnv] || "").trim();
   return configured ? resolve(configured) : join(rootDir, ".brain-hacking", "oauth-grants.json");
+}
+
+function resolveAuditLogPath(env, rootDir) {
+  const configured = String(env?.[auditLogPathEnv] || "").trim();
+  return configured ? resolve(configured) : join(rootDir, ".brain-hacking", "oauth-audit-log.json");
 }

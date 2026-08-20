@@ -44,7 +44,7 @@ export function createRequestHandler(options = {}) {
 
     try {
       if (parsed.pathname === "/api/oauth/authorization") {
-        await handleOAuthAuthorization(parsed, res, stateStore, now);
+        await handleOAuthAuthorization(parsed, res, stateStore, oauthRuntime, now);
         return;
       }
 
@@ -69,7 +69,7 @@ export function createRequestHandler(options = {}) {
       }
 
       if (parsed.pathname === "/oauth/callback") {
-        handleOAuthCallback(requestUrl, res, stateStore, now);
+        handleOAuthCallback(requestUrl, res, stateStore, oauthRuntime, now);
         return;
       }
 
@@ -107,6 +107,7 @@ async function handleOAuthGrants(req, url, res, oauthRuntime, now) {
       200,
       listOAuthGrantSummaries({
         tokenVault: oauthRuntime.loadTokenVault(),
+        auditLog: oauthRuntime.loadAuditLog?.(),
         providerId
       })
     );
@@ -128,6 +129,7 @@ async function handleOAuthGrants(req, url, res, oauthRuntime, now) {
       200,
       disconnectOAuthGrant({
         tokenVault: oauthRuntime.loadTokenVault(),
+        auditLog: oauthRuntime.loadAuditLog?.(),
         providerId,
         accountId,
         now
@@ -146,13 +148,14 @@ function handleOAuthGrantExport(url, res, oauthRuntime, now) {
     200,
     exportOAuthGrantSummaries({
       tokenVault: oauthRuntime.loadTokenVault(),
+      auditLog: oauthRuntime.loadAuditLog?.(),
       providerId,
       now
     })
   );
 }
 
-async function handleOAuthAuthorization(url, res, stateStore, now) {
+async function handleOAuthAuthorization(url, res, stateStore, oauthRuntime, now) {
   const providerId = url.searchParams.get("provider") || "";
   const provider = getProvider(providerId);
   if (provider.mode !== "oauth-pkce") {
@@ -174,6 +177,15 @@ async function handleOAuthAuthorization(url, res, stateStore, now) {
     clientId,
     digest: nodeSha256Digest
   });
+  appendOAuthAudit(oauthRuntime, {
+    action: "authorization-requested",
+    providerId: provider.id,
+    status: "authorization-request-created",
+    metadata: {
+      scopeCount: state.scopes.length,
+      redirectHost: new URL(state.redirectUri).host
+    }
+  });
 
   sendJson(res, 200, {
     providerId: provider.id,
@@ -191,11 +203,21 @@ async function handleOAuthAuthorization(url, res, stateStore, now) {
   });
 }
 
-function handleOAuthCallback(requestUrl, res, stateStore, now) {
+function handleOAuthCallback(requestUrl, res, stateStore, oauthRuntime, now) {
   const result = parseOAuthCallback(requestUrl, stateStore.values(), { now });
   if (result.stateNonce) {
     stateStore.delete(result.stateNonce);
   }
+  appendOAuthAudit(oauthRuntime, {
+    action: "callback-received",
+    providerId: result.providerId,
+    status: result.status,
+    metadata: {
+      ok: result.ok,
+      stateVerified: result.stateVerified,
+      scopeCount: result.scopes?.length || 0
+    }
+  });
   sendJson(res, result.ok ? 200 : 400, result);
 }
 
@@ -234,6 +256,26 @@ async function handleOAuthTokenExchange(req, res, stateStore, oauthRuntime, now)
   });
 
   stateStore.delete(stateNonce);
+  appendOAuthAudit(oauthRuntime, {
+    action: "callback-received",
+    providerId: callbackAudit.providerId,
+    status: callbackAudit.status,
+    metadata: {
+      ok: callbackAudit.ok,
+      stateVerified: callbackAudit.stateVerified,
+      scopeCount: callbackAudit.scopes.length
+    }
+  });
+  appendOAuthAudit(oauthRuntime, {
+    action: "token-exchange-completed",
+    providerId: exchange.providerId,
+    accountId: exchange.accountId,
+    status: exchange.status,
+    metadata: {
+      scopeCount: exchange.grant.scopes.length,
+      hasRefreshToken: exchange.grant.hasRefreshToken
+    }
+  });
   sendJson(res, 200, {
     ok: true,
     status: "token-exchange-complete",
@@ -275,6 +317,13 @@ function normalizeRouteValue(value, label) {
     throw new Error(`${label} is required.`);
   }
   return normalized;
+}
+
+function appendOAuthAudit(oauthRuntime, event) {
+  const auditLog = oauthRuntime?.loadAuditLog?.();
+  if (auditLog) {
+    auditLog.append(event);
+  }
 }
 
 async function nodeSha256Digest(bytes) {

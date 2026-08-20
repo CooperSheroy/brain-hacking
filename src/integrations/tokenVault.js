@@ -66,7 +66,6 @@ export function summarizeTokenVaultReadiness() {
     algorithm,
     requiredRuntime: "Node.js backend with a 32-byte key outside browser storage",
     remainingBeforeImports: [
-      "audit-log wiring",
       "feature-flagged import worker",
       "rate-limit handling"
     ]

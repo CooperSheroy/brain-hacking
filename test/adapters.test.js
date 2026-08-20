@@ -21,7 +21,7 @@ test("manual adapter imports user-provided local text", () => {
   assert.equal(result.summary.byType.topic, 2);
 });
 
-test("official OAuth adapters are gated until audit logs and import workers exist", () => {
+test("official OAuth adapters are gated until import workers and provider hardening exist", () => {
   const adapter = getImportAdapter("twitter");
   const readiness = summarizeAdapterReadiness("twitter");
 

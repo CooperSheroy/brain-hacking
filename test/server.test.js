@@ -2,13 +2,20 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test from "node:test";
 import { createRequestHandler } from "../server.js";
+import { createMemoryOAuthAuditLog } from "../src/integrations/oauthAuditLog.js";
 import { createInMemoryTokenVault } from "../src/integrations/tokenVault.js";
 
 test("server creates OAuth authorization metadata and verifies callback state", async () => {
+  const auditLog = createMemoryOAuthAuditLog({
+    now: () => Date.parse("2026-07-29T10:02:00.000Z")
+  });
   const server = createServer(
     createRequestHandler({
       stateStore: new Map(),
-      now: () => Date.parse("2026-07-29T10:02:00.000Z")
+      now: () => Date.parse("2026-07-29T10:02:00.000Z"),
+      oauthRuntime: {
+        loadAuditLog: () => auditLog
+      }
     })
   );
   await listen(server);
@@ -33,6 +40,10 @@ test("server creates OAuth authorization metadata and verifies callback state", 
     assert.equal(callback.status, "authorization-code-received");
     assert.equal(callback.tokenExchangeReady, false);
     assert.equal("code" in callback, false);
+    assert.deepEqual(
+      auditLog.list().map((event) => event.action),
+      ["authorization-requested", "callback-received"]
+    );
   } finally {
     await close(server);
   }
@@ -44,6 +55,9 @@ test("server exchanges verified OAuth callbacks through backend vault wiring", a
     encryptionKey: new Uint8Array(32).fill(7),
     now: () => Date.parse("2026-08-18T09:30:00.000Z"),
     randomBytes: (length) => new Uint8Array(length).fill(5)
+  });
+  const auditLog = createMemoryOAuthAuditLog({
+    now: () => Date.parse("2026-08-18T09:30:00.000Z")
   });
   let capturedTokenRequest;
   const server = createServer(
@@ -68,6 +82,7 @@ test("server exchanges verified OAuth callbacks through backend vault wiring", a
           };
         },
         loadTokenVault: () => vault,
+        loadAuditLog: () => auditLog,
         getClientConfig: () => ({ clientId: "client-123" })
       }
     })
@@ -100,6 +115,10 @@ test("server exchanges verified OAuth callbacks through backend vault wiring", a
     assert.equal(stateStore.size, 0);
     assert.equal(capturedTokenRequest.url, "https://api.twitter.com/2/oauth2/token");
     assert.equal(vault.loadGrant({ providerId: "twitter", accountId: "user-123" }).tokenSet.accessToken, "server-side-access-token");
+    assert.deepEqual(
+      auditLog.list().map((event) => event.action),
+      ["authorization-requested", "callback-received", "token-exchange-completed"]
+    );
   } finally {
     await close(server);
   }
@@ -122,6 +141,9 @@ test("server exposes sanitized OAuth grant list, export, and disconnect controls
       expiresAt: "2026-08-19T05:10:00.000Z"
     }
   });
+  const auditLog = createMemoryOAuthAuditLog({
+    now: () => Date.parse("2026-08-19T04:10:00.000Z")
+  });
 
   const server = createServer(
     createRequestHandler({
@@ -131,6 +153,7 @@ test("server exposes sanitized OAuth grant list, export, and disconnect controls
           throw new Error("fetch should not run");
         },
         loadTokenVault: () => vault,
+        loadAuditLog: () => auditLog,
         getClientConfig: () => ({ clientId: "client-123" })
       }
     })
@@ -165,6 +188,10 @@ test("server exposes sanitized OAuth grant list, export, and disconnect controls
     assert.equal(disconnected.deleted, true);
     assert.equal(emptyResponse.status, 200);
     assert.deepEqual(empty.grants, []);
+    assert.deepEqual(
+      auditLog.list().map((event) => event.action),
+      ["grant-listed", "grant-exported", "grant-disconnected", "grant-listed"]
+    );
   } finally {
     await close(server);
   }

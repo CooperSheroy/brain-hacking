@@ -6,10 +6,18 @@ const guardrails = [
   "disconnect by deleting the encrypted server-side grant"
 ];
 
-export function listOAuthGrantSummaries({ tokenVault, providerId } = {}) {
+export function listOAuthGrantSummaries({ tokenVault, providerId, auditLog } = {}) {
   const vault = assertTokenVault(tokenVault);
   const provider = providerId ? assertOAuthProvider(providerId) : null;
   const grants = vault.listGrants(provider?.id).map(sanitizeGrantSummary);
+  appendAuditEvent(auditLog, {
+    action: "grant-listed",
+    providerId: provider?.id,
+    status: "oauth-grant-list-ready",
+    metadata: {
+      grantCount: grants.length
+    }
+  });
 
   return {
     status: "oauth-grant-list-ready",
@@ -19,8 +27,16 @@ export function listOAuthGrantSummaries({ tokenVault, providerId } = {}) {
   };
 }
 
-export function exportOAuthGrantSummaries({ tokenVault, providerId, now = Date.now } = {}) {
+export function exportOAuthGrantSummaries({ tokenVault, providerId, auditLog, now = Date.now } = {}) {
   const listing = listOAuthGrantSummaries({ tokenVault, providerId });
+  appendAuditEvent(auditLog, {
+    action: "grant-exported",
+    providerId: listing.providerId,
+    status: "oauth-grant-export-ready",
+    metadata: {
+      grantCount: listing.grants.length
+    }
+  });
 
   return {
     status: "oauth-grant-export-ready",
@@ -32,11 +48,20 @@ export function exportOAuthGrantSummaries({ tokenVault, providerId, now = Date.n
   };
 }
 
-export function disconnectOAuthGrant({ tokenVault, providerId, accountId, now = Date.now } = {}) {
+export function disconnectOAuthGrant({ tokenVault, providerId, accountId, auditLog, now = Date.now } = {}) {
   const vault = assertTokenVault(tokenVault);
   const provider = assertOAuthProvider(providerId);
   const account = normalizeAccountId(accountId);
   const deleted = vault.deleteGrant({ providerId: provider.id, accountId: account });
+  appendAuditEvent(auditLog, {
+    action: "grant-disconnected",
+    providerId: provider.id,
+    accountId: account,
+    status: deleted ? "oauth-grant-disconnected" : "oauth-grant-not-found",
+    metadata: {
+      deleted
+    }
+  });
 
   return {
     status: deleted ? "oauth-grant-disconnected" : "oauth-grant-not-found",
@@ -53,7 +78,6 @@ export function summarizeOAuthGrantControlReadiness() {
     status: "disconnect-delete-export-controls-ready",
     supportedOperations: ["list sanitized grants", "export sanitized grant metadata", "disconnect stored grants"],
     remainingBeforeImports: [
-      "audit-log wiring",
       "feature-flagged import worker",
       "provider rate-limit handling",
       "provider-specific production permission review"
@@ -67,6 +91,16 @@ function assertTokenVault(tokenVault) {
     throw new TypeError("OAuth grant controls require a server-side token vault.");
   }
   return tokenVault;
+}
+
+function appendAuditEvent(auditLog, event) {
+  if (!auditLog) {
+    return;
+  }
+  if (typeof auditLog.append !== "function") {
+    throw new TypeError("OAuth grant controls require an audit log with append().");
+  }
+  auditLog.append(event);
 }
 
 function assertOAuthProvider(providerId) {

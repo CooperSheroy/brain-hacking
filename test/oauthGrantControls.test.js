@@ -106,5 +106,5 @@ test("OAuth grant control readiness keeps official imports gated", () => {
 
   assert.equal(readiness.status, "disconnect-delete-export-controls-ready");
   assert.ok(readiness.supportedOperations.includes("disconnect stored grants"));
-  assert.ok(readiness.remainingBeforeImports.includes("audit-log wiring"));
+  assert.ok(readiness.remainingBeforeImports.includes("feature-flagged import worker"));
 });

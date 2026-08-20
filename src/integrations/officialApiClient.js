@@ -57,6 +57,7 @@ export function createOfficialReadClient({
   providerId,
   accountId,
   tokenVault,
+  auditLog,
   fetchImpl = globalThis.fetch,
   now = Date.now
 } = {}) {
@@ -76,6 +77,16 @@ export function createOfficialReadClient({
 
     async importActivities(endpointId, options = {}) {
       const endpoint = findEndpoint(provider.id, endpointId);
+      appendAuditEvent(auditLog, {
+        action: "official-read-import-attempted",
+        providerId: provider.id,
+        accountId: normalizedAccountId,
+        status: "official-read-import-started",
+        metadata: {
+          endpointId: endpoint.id,
+          requiredScope: endpoint.scope
+        }
+      });
       const grant = tokenVault.loadGrant({ providerId: provider.id, accountId: normalizedAccountId });
       assertUsableGrant(provider.id, grant, endpoint.scope, now);
 
@@ -90,6 +101,16 @@ export function createOfficialReadClient({
 
       const payload = await readJsonResponse(response);
       if (!response.ok) {
+        appendAuditEvent(auditLog, {
+          action: "official-read-import-attempted",
+          providerId: provider.id,
+          accountId: normalizedAccountId,
+          status: "official-read-import-failed",
+          metadata: {
+            endpointId: endpoint.id,
+            providerStatus: response.status
+          }
+        });
         throw new Error(formatProviderError(provider.id, response.status, payload));
       }
 
@@ -99,6 +120,17 @@ export function createOfficialReadClient({
         permissionScope: record.permissionScope || endpoint.scope
       }));
       const activities = normalizeProviderActivities(provider.id, records);
+      appendAuditEvent(auditLog, {
+        action: "official-read-import-attempted",
+        providerId: provider.id,
+        accountId: normalizedAccountId,
+        status: "official-read-import-succeeded",
+        metadata: {
+          endpointId: endpoint.id,
+          activityCount: activities.length,
+          requiredScope: endpoint.scope
+        }
+      });
 
       return {
         providerId: provider.id,
@@ -113,6 +145,16 @@ export function createOfficialReadClient({
       };
     }
   };
+}
+
+function appendAuditEvent(auditLog, event) {
+  if (!auditLog) {
+    return;
+  }
+  if (typeof auditLog.append !== "function") {
+    throw new TypeError("Official read client requires an audit log with append().");
+  }
+  auditLog.append(event);
 }
 
 function assertOAuthProvider(providerId) {

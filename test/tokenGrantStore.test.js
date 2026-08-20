@@ -79,5 +79,5 @@ test("file token grant store readiness keeps imports gated behind user controls"
 
   assert.equal(readiness.status, "persistent-store-primitive-ready");
   assert.ok(readiness.guardrails.some((guardrail) => guardrail.includes("vault-encrypted")));
-  assert.ok(readiness.remainingBeforeImports.includes("audit-log wiring"));
+  assert.ok(readiness.remainingBeforeImports.includes("feature-flagged import worker"));
 });

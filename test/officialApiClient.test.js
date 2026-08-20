@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createMemoryOAuthAuditLog } from "../src/integrations/oauthAuditLog.js";
 import { createOfficialReadClient, listOfficialReadEndpoints } from "../src/integrations/officialApiClient.js";
 import { createInMemoryTokenVault } from "../src/integrations/tokenVault.js";
 
@@ -42,10 +43,12 @@ test("listOfficialReadEndpoints exposes least-privilege read endpoints without U
 
 test("official read client imports provider data through vault-backed read requests", async () => {
   let capturedRequest;
+  const auditLog = createMemoryOAuthAuditLog({ now });
   const client = createOfficialReadClient({
     providerId: "twitter",
     accountId: "user-123",
     tokenVault: createVault(),
+    auditLog,
     now,
     fetchImpl: async (url, init) => {
       capturedRequest = { url, init };
@@ -79,6 +82,13 @@ test("official read client imports provider data through vault-backed read reque
   assert.equal(result.summary.total, 1);
   assert.equal(result.summary.bySource.twitter, 1);
   assert.equal(result.summary.byType.like, 1);
+  assert.deepEqual(
+    auditLog.list().map((event) => [event.status, event.metadata.endpointId]),
+    [
+      ["official-read-import-started", "liked-posts"],
+      ["official-read-import-succeeded", "liked-posts"]
+    ]
+  );
   assert.deepEqual(result.activities, [
     {
       id: "twitter-tweet-1",
@@ -123,10 +133,12 @@ test("official read client blocks missing scopes and expired grants before fetch
 });
 
 test("official read client surfaces provider failures and rate limits", async () => {
+  const auditLog = createMemoryOAuthAuditLog({ now });
   const rateLimitedClient = createOfficialReadClient({
     providerId: "twitter",
     accountId: "user-123",
     tokenVault: createVault(),
+    auditLog,
     now,
     fetchImpl: async () => ({
       ok: false,
@@ -138,6 +150,10 @@ test("official read client surfaces provider failures and rate limits", async ()
   });
 
   await assert.rejects(() => rateLimitedClient.importActivities("liked-posts"), /rate limit/u);
+  assert.deepEqual(
+    auditLog.list().map((event) => event.status),
+    ["official-read-import-started", "official-read-import-failed"]
+  );
 
   const failedClient = createOfficialReadClient({
     providerId: "twitter",
