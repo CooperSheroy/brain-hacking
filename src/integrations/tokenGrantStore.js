@@ -46,8 +46,8 @@ export function summarizeTokenGrantStoreReadiness() {
       "uses atomic file replacement for grant updates"
     ],
     remainingBeforeImports: [
-      "feature-flagged import worker",
-      "rate-limit handling"
+      "production route or scheduler wiring",
+      "provider-specific production permission review"
     ]
   };
 }

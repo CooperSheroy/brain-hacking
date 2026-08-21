@@ -72,11 +72,9 @@ export function summarizeOAuthAuditLogReadiness() {
     guardrails: [
       "records sanitized provider, account, action, status, and metadata only",
       "rejects token-like fields before persistence",
-      "keeps official imports gated behind user controls and rate-limit handling"
+      "keeps official imports gated behind explicit backend feature flags"
     ],
     remainingBeforeImports: [
-      "feature-flagged import worker",
-      "provider rate-limit handling",
       "provider-specific production permission review"
     ]
   };

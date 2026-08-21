@@ -28,5 +28,5 @@ test("official OAuth adapters are gated until import workers and provider harden
   assert.equal(adapter.canImportNow, false);
   assert.equal(readiness.importMode, "official OAuth read import");
   assert.ok(readiness.guardrails.some((guardrail) => guardrail.includes("least-privilege")));
-  assert.throws(() => adapter.importActivities(), /audit logging/u);
+  assert.throws(() => adapter.importActivities(), /provider permission review/u);
 });

@@ -143,16 +143,32 @@ test("official read client surfaces provider failures and rate limits", async ()
     fetchImpl: async () => ({
       ok: false,
       status: 429,
+      headers: {
+        get(name) {
+          return name.toLowerCase() === "retry-after" ? "90" : "";
+        }
+      },
       async json() {
         return { title: "Too many requests" };
       }
     })
   });
 
-  await assert.rejects(() => rateLimitedClient.importActivities("liked-posts"), /rate limit/u);
+  await assert.rejects(
+    () => rateLimitedClient.importActivities("liked-posts"),
+    (error) => {
+      assert.match(error.message, /rate limit/u);
+      assert.equal(error.providerStatus, 429);
+      assert.equal(error.retryAfterSeconds, 90);
+      return true;
+    }
+  );
   assert.deepEqual(
-    auditLog.list().map((event) => event.status),
-    ["official-read-import-started", "official-read-import-failed"]
+    auditLog.list().map((event) => [event.status, event.metadata.retryAfterSeconds]),
+    [
+      ["official-read-import-started", undefined],
+      ["official-read-import-failed", 90]
+    ]
   );
 
   const failedClient = createOfficialReadClient({

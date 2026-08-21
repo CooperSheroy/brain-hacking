@@ -12,7 +12,7 @@ The long-term direction is a consent-based personality and feed portfolio: a map
 - Personality portfolio estimate from the selected goal and user-provided feed signals.
 - Exportable local plan JSON.
 - Static browser app with a tiny Node server.
-- Provider integration foundation with OAuth/PKCE request construction, server-side callback intake, backend token exchange route, encrypted token vault primitives, file-backed encrypted grant storage, server-side grant list/export/disconnect controls, consent summaries, and normalized activity boundaries.
+- Provider integration foundation with OAuth/PKCE request construction, server-side callback intake, backend token exchange route, encrypted token vault primitives, file-backed encrypted grant storage, server-side grant list/export/disconnect controls, consent summaries, normalized activity boundaries, and a disabled-by-default official import worker.
 
 ## Run
 
@@ -54,6 +54,7 @@ Real social media account connections are not live yet. The repository now conta
 - backend-only token exchange route that saves grants through the encrypted vault without returning raw codes or tokens;
 - backend-only encrypted token envelopes and a file-backed grant store for future official token exchange wiring;
 - server-side grant controls for listing/exporting sanitized metadata and disconnecting stored grants without exposing token material;
+- disabled-by-default official import worker that reads only consented endpoints, stops on rate limits, and returns normalized activity summaries without token material;
 - per-scope consent and risk summaries;
 - normalized activity boundaries for imported or manually supplied signals.
 

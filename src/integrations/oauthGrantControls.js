@@ -78,8 +78,6 @@ export function summarizeOAuthGrantControlReadiness() {
     status: "disconnect-delete-export-controls-ready",
     supportedOperations: ["list sanitized grants", "export sanitized grant metadata", "disconnect stored grants"],
     remainingBeforeImports: [
-      "feature-flagged import worker",
-      "provider rate-limit handling",
       "provider-specific production permission review"
     ],
     guardrails: [...guardrails]

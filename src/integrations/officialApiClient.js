@@ -101,6 +101,7 @@ export function createOfficialReadClient({
 
       const payload = await readJsonResponse(response);
       if (!response.ok) {
+        const providerError = createProviderError(provider.id, response, payload, now);
         appendAuditEvent(auditLog, {
           action: "official-read-import-attempted",
           providerId: provider.id,
@@ -108,10 +109,11 @@ export function createOfficialReadClient({
           status: "official-read-import-failed",
           metadata: {
             endpointId: endpoint.id,
-            providerStatus: response.status
+            providerStatus: response.status,
+            retryAfterSeconds: providerError.retryAfterSeconds || ""
           }
         });
-        throw new Error(formatProviderError(provider.id, response.status, payload));
+        throw providerError;
       }
 
       const records = extractRecords(payload).map((record) => ({
@@ -208,9 +210,21 @@ async function readJsonResponse(response) {
   return response.json();
 }
 
-function formatProviderError(providerId, status, payload) {
+function createProviderError(providerId, response, payload, now) {
+  const retryAfterSeconds = parseRetryAfterSeconds(response.headers?.get?.("retry-after"), now);
+  const error = new Error(formatProviderError(providerId, response.status, payload, retryAfterSeconds));
+  error.providerId = providerId;
+  error.providerStatus = response.status;
+  if (retryAfterSeconds) {
+    error.retryAfterSeconds = retryAfterSeconds;
+  }
+  return error;
+}
+
+function formatProviderError(providerId, status, payload, retryAfterSeconds = 0) {
   if (status === 429) {
-    return `${providerId} API rate limit reached; retry after the provider reset window.`;
+    const retryNote = retryAfterSeconds ? ` Retry after ${retryAfterSeconds} seconds.` : "";
+    return `${providerId} API rate limit reached; retry after the provider reset window.${retryNote}`;
   }
   const detail = cleanErrorDetail(payload?.error_description || payload?.error?.message || payload?.title);
   return detail
@@ -244,4 +258,22 @@ function cleanErrorDetail(value) {
     .replace(/\s+/gu, " ")
     .trim()
     .slice(0, 160);
+}
+
+function parseRetryAfterSeconds(value, now) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return 0;
+  }
+
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds > 0) {
+    return Math.ceil(seconds);
+  }
+
+  const retryAt = Date.parse(raw);
+  if (Number.isFinite(retryAt)) {
+    return Math.max(0, Math.ceil((retryAt - now()) / 1000));
+  }
+  return 0;
 }

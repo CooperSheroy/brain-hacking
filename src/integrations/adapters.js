@@ -2,9 +2,7 @@ import { normalizeManualSignals, summarizeActivities } from "./normalizedActivit
 import { getProvider, getProviderIds, providerCatalog } from "./providers.js";
 
 const oauthImportBlockers = [
-  "audit logging for consent, import, and account-disconnect events",
-  "feature-flagged import worker that reads through the official API client",
-  "provider rate-limit handling",
+  "production route or scheduler wiring for the feature-flagged official import worker",
   "provider-specific production permission review"
 ];
 
@@ -75,7 +73,7 @@ function createOfficialOAuthAdapter(provider) {
     supportedSignals: [...provider.supportedSignals],
     requiredScopes: [...provider.defaultScopes],
     blockers: [...oauthImportBlockers],
-    nextRequiredStep: "Add audit logging and a feature-flagged official API import worker before enabling stored-grant imports.",
+    nextRequiredStep: "Wire the feature-flagged official import worker into a production route or scheduler after provider review.",
     guardrails: [
       "request least-privilege read scopes",
       "store tokens server-side only",
@@ -83,7 +81,7 @@ function createOfficialOAuthAdapter(provider) {
     ],
     importActivities() {
       throw new Error(
-        `${provider.label} imports require audit logging, rate-limit handling, production permission review, and a feature-flagged official API import worker first.`
+        `${provider.label} imports require production route or scheduler wiring and provider permission review before user-facing stored-grant imports are enabled.`
       );
     }
   };

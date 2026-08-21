@@ -81,5 +81,6 @@ test("OAuth audit log readiness closes audit gap without enabling imports", () =
   assert.equal(readiness.status, "oauth-audit-log-ready");
   assert.ok(readiness.events.includes("token-exchange-completed"));
   assert.ok(readiness.guardrails.some((guardrail) => guardrail.includes("token-like fields")));
-  assert.ok(readiness.remainingBeforeImports.includes("feature-flagged import worker"));
+  assert.ok(readiness.guardrails.some((guardrail) => guardrail.includes("feature flags")));
+  assert.ok(readiness.remainingBeforeImports.includes("provider-specific production permission review"));
 });
