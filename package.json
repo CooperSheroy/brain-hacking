@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --test",
-    "check": "node --check server.js && node --check src/app.js && node --check src/feedPlanner.js && node --check src/portfolioModel.js && node --check src/integrations/adapters.js && node --check src/integrations/oauth.js && node --check src/integrations/oauthCallback.js && node --check src/integrations/oauthTokenExchange.js && node --check src/integrations/oauthRuntime.js && node --check src/integrations/oauthGrantControls.js && node --check src/integrations/oauthAuditLog.js && node --check src/integrations/providers.js && node --check src/integrations/normalizedActivity.js && node --check src/integrations/tokenVault.js && node --check src/integrations/tokenGrantStore.js && node --check src/integrations/officialApiClient.js && node --check src/integrations/officialImportWorker.js"
+    "check": "node --check server.js && node --check src/app.js && node --check src/feedPlanner.js && node --check src/portfolioModel.js && node --check src/integrations/adapters.js && node --check src/integrations/oauth.js && node --check src/integrations/oauthCallback.js && node --check src/integrations/oauthTokenExchange.js && node --check src/integrations/oauthRuntime.js && node --check src/integrations/oauthGrantControls.js && node --check src/integrations/oauthAuditLog.js && node --check src/integrations/providers.js && node --check src/integrations/normalizedActivity.js && node --check src/integrations/activityStore.js && node --check src/integrations/tokenVault.js && node --check src/integrations/tokenGrantStore.js && node --check src/integrations/officialApiClient.js && node --check src/integrations/officialImportWorker.js"
   },
   "keywords": [
     "social-media",

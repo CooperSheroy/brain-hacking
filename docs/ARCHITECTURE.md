@@ -42,6 +42,7 @@ Provider OAuth
 - `src/integrations/tokenVault.js`: backend-only encrypted token grant envelopes for future persistent OAuth grant storage.
 - `src/integrations/tokenGrantStore.js`: file-backed persistence for encrypted OAuth grant envelopes, designed to sit behind the backend token vault.
 - `src/integrations/normalizedActivity.js`: normalized activity primitives for manual imports and sanitized official provider records.
+- `src/integrations/activityStore.js`: file-backed normalized activity history primitive with idempotent source/id upserts and source/time-bounded deletion.
 - `src/app.js`: browser state management, view switching, rendering, and export.
 - `server.js`: no-framework local static server for development.
 
@@ -49,7 +50,7 @@ Provider OAuth
 
 The MVP only processes text the user manually provides in the browser. No remote API calls are made. Manual text is first converted into normalized local activity records, then the portfolio model reads those records through the same boundary planned for official integrations.
 
-The integration foundation can construct OAuth authorization requests, verify callback state on the local Node server, exchange authorization codes in a server-only route, encrypt token grant envelopes for backend storage, persist those encrypted envelopes in a server-side file store, record sanitized audit events, and expose sanitized grant list/export/disconnect controls. It does not collect production credentials in the browser or call provider APIs from the static UI. Token exchange, storage, and audit wiring live in the backend service.
+The integration foundation can construct OAuth authorization requests, verify callback state on the local Node server, exchange authorization codes in a server-only route, encrypt token grant envelopes for backend storage, persist those encrypted envelopes in a server-side file store, record sanitized audit events, expose sanitized grant list/export/disconnect controls, and persist sanitized normalized activity records in a separate local store primitive. It does not collect production credentials in the browser or call provider APIs from the static UI. Token exchange, storage, activity history, and audit wiring live in the backend service.
 
 For the long-term version, every platform connector needs:
 
