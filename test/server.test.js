@@ -197,6 +197,144 @@ test("server exposes sanitized OAuth grant list, export, and disconnect controls
   }
 });
 
+test("server keeps official OAuth import route inert until backend flag is enabled", async () => {
+  const auditLog = createMemoryOAuthAuditLog({
+    now: () => Date.parse("2026-08-24T04:10:00.000Z")
+  });
+  const server = createServer(
+    createRequestHandler({
+      now: () => Date.parse("2026-08-24T04:10:00.000Z"),
+      oauthRuntime: {
+        officialImportsEnabled: false,
+        fetchImpl: async () => {
+          throw new Error("fetch should not run while official imports are disabled");
+        },
+        loadTokenVault: () => {
+          throw new Error("token vault should not load while official imports are disabled");
+        },
+        loadActivityStore: () => {
+          throw new Error("activity store should not load while official imports are disabled");
+        },
+        loadAuditLog: () => auditLog
+      }
+    })
+  );
+  await listen(server);
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/oauth/import`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ providerId: "twitter", accountId: "user-123" })
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.status, "official-import-disabled");
+    assert.equal(payload.importedActivityCount, 0);
+    assert.equal(payload.persistence.status, "normalized-activities-not-persisted");
+    assert.equal("activities" in payload, false);
+    assert.deepEqual(auditLog.list(), []);
+  } finally {
+    await close(server);
+  }
+});
+
+test("server official OAuth import route persists normalized activities when enabled", async () => {
+  const vault = createInMemoryTokenVault({
+    encryptionKey: new Uint8Array(32).fill(11),
+    now: () => Date.parse("2026-08-24T04:15:00.000Z"),
+    randomBytes: (length) => new Uint8Array(length).fill(8)
+  });
+  vault.saveGrant({
+    providerId: "twitter",
+    accountId: "user-123",
+    scopes: ["tweet.read"],
+    tokenSet: {
+      accessToken: "server-side-access-token",
+      tokenType: "Bearer",
+      expiresAt: "2026-08-24T05:15:00.000Z"
+    }
+  });
+  const auditLog = createMemoryOAuthAuditLog({
+    now: () => Date.parse("2026-08-24T04:15:00.000Z")
+  });
+  const persistedActivities = [];
+  const activityStore = {
+    saveActivities(records) {
+      persistedActivities.push(...records);
+      return {
+        status: "normalized-activities-saved",
+        inserted: records.length,
+        updated: 0,
+        total: persistedActivities.length,
+        summary: {
+          total: persistedActivities.length,
+          bySource: { twitter: persistedActivities.length },
+          byType: { like: persistedActivities.length }
+        }
+      };
+    }
+  };
+  const server = createServer(
+    createRequestHandler({
+      now: () => Date.parse("2026-08-24T04:15:00.000Z"),
+      oauthRuntime: {
+        officialImportsEnabled: true,
+        fetchImpl: async (url, init) => {
+          assert.equal(url, "https://api.twitter.com/2/users/user-123/liked_tweets?limit=1");
+          assert.equal(init.method, "GET");
+          assert.equal(init.headers.authorization, "Bearer server-side-access-token");
+          return {
+            ok: true,
+            status: 200,
+            async json() {
+              return { data: [{ id: "tweet-1", text: "Deep work systems" }] };
+            }
+          };
+        },
+        loadTokenVault: () => vault,
+        loadActivityStore: () => activityStore,
+        loadAuditLog: () => auditLog
+      }
+    })
+  );
+  await listen(server);
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/oauth/import`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        providerId: "twitter",
+        accountId: "user-123",
+        endpointIds: ["liked-posts"],
+        limit: 1
+      })
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.status, "official-import-succeeded");
+    assert.equal(payload.importedActivityCount, 1);
+    assert.equal(payload.importSummary.bySource.twitter, 1);
+    assert.equal(payload.persistence.status, "normalized-activities-persisted");
+    assert.equal(persistedActivities[0].id, "twitter-tweet-1");
+    assert.equal(JSON.stringify(payload).includes("server-side-access-token"), false);
+    assert.equal("activities" in payload, false);
+    assert.deepEqual(
+      auditLog.list().map((event) => event.status),
+      [
+        "official-read-import-started",
+        "official-read-import-succeeded",
+        "official-import-activities-persisted"
+      ]
+    );
+  } finally {
+    await close(server);
+  }
+});
+
 test("server rejects OAuth callbacks that lack server-created state", async () => {
   const server = createServer(createRequestHandler({ stateStore: new Map() }));
   await listen(server);

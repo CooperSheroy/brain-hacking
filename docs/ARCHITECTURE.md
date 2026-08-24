@@ -36,7 +36,7 @@ Provider OAuth
 - `src/integrations/oauth.js`: OAuth PKCE state, consent summaries, and authorization request construction.
 - `src/integrations/oauthCallback.js`: server-side OAuth callback verification and no-token audit result shaping.
 - `src/integrations/oauthTokenExchange.js`: server-only authorization-code exchange boundary that requires verified PKCE state and stores token material only through a token vault.
-- `src/integrations/oauthRuntime.js`: server runtime wiring for OAuth client configuration, encrypted file-backed grant storage, and no-secret readiness summaries.
+- `src/integrations/oauthRuntime.js`: server runtime wiring for OAuth client configuration, encrypted file-backed grant storage, normalized activity storage, feature-flagged official imports, and no-secret readiness summaries.
 - `src/integrations/oauthAuditLog.js`: append-only server-side audit log for sanitized OAuth consent, callback, exchange, grant-control, and official-read attempt events.
 - `src/integrations/oauthGrantControls.js`: server-side list/export/disconnect controls over sanitized OAuth grant summaries.
 - `src/integrations/tokenVault.js`: backend-only encrypted token grant envelopes for future persistent OAuth grant storage.
@@ -51,7 +51,7 @@ Provider OAuth
 
 The MVP only processes text the user manually provides in the browser. No remote API calls are made. Manual text is first converted into normalized local activity records, then the portfolio model reads those records through the same boundary planned for official integrations.
 
-The integration foundation can construct OAuth authorization requests, verify callback state on the local Node server, exchange authorization codes in a server-only route, encrypt token grant envelopes for backend storage, persist those encrypted envelopes in a server-side file store, record sanitized audit events, expose sanitized grant list/export/disconnect controls, persist sanitized normalized activity records in a separate local store primitive, and save derived portfolio snapshots for local history comparisons. It does not collect production credentials in the browser or call provider APIs from the static UI. Token exchange, storage, activity history, portfolio history, and audit wiring live in the backend service.
+The integration foundation can construct OAuth authorization requests, verify callback state on the local Node server, exchange authorization codes in a server-only route, encrypt token grant envelopes for backend storage, persist those encrypted envelopes in a server-side file store, record sanitized audit events, expose sanitized grant list/export/disconnect controls, run a disabled-by-default official import route that saves only normalized activities after explicit backend enablement, persist sanitized normalized activity records in a separate local store primitive, and save derived portfolio snapshots for local history comparisons. It does not collect production credentials in the browser or call provider APIs from the static UI. Token exchange, storage, activity history, portfolio history, and audit wiring live in the backend service.
 
 For the long-term version, every platform connector needs:
 

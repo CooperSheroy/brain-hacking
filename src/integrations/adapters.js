@@ -2,7 +2,8 @@ import { normalizeManualSignals, summarizeActivities } from "./normalizedActivit
 import { getProvider, getProviderIds, providerCatalog } from "./providers.js";
 
 const oauthImportBlockers = [
-  "production route or scheduler wiring for the feature-flagged official import worker",
+  "explicit backend feature-flag enablement for the official import route",
+  "user-visible import history controls",
   "provider-specific production permission review"
 ];
 
@@ -73,7 +74,7 @@ function createOfficialOAuthAdapter(provider) {
     supportedSignals: [...provider.supportedSignals],
     requiredScopes: [...provider.defaultScopes],
     blockers: [...oauthImportBlockers],
-    nextRequiredStep: "Wire the feature-flagged official import worker into a production route or scheduler after provider review.",
+    nextRequiredStep: "Add user-visible import history controls and complete provider review before enabling stored-grant imports.",
     guardrails: [
       "request least-privilege read scopes",
       "store tokens server-side only",
@@ -81,7 +82,7 @@ function createOfficialOAuthAdapter(provider) {
     ],
     importActivities() {
       throw new Error(
-        `${provider.label} imports require production route or scheduler wiring and provider permission review before user-facing stored-grant imports are enabled.`
+        `${provider.label} imports require user-visible history controls and provider permission review before user-facing stored-grant imports are enabled.`
       );
     }
   };

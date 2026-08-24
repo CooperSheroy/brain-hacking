@@ -110,9 +110,9 @@ export function summarizeOfficialImportWorkerReadiness() {
     importMode,
     guardrails: [...guardrails],
     remainingBeforeProduction: [
-      "wire a backend route or scheduler that keeps the worker disabled by default",
+      "keep the backend import route disabled until explicit operator enablement and provider review",
       "complete provider-specific production permission review",
-      "persist normalized activity snapshots for portfolio history"
+      "add user-visible import history controls"
     ]
   };
 }

@@ -15,26 +15,26 @@ Provider catalog
   -> Feed/personality analysis
 ```
 
-The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, a backend token exchange route, server-side runtime configuration, encrypted token vault primitives, file-backed encrypted grant persistence, sanitized OAuth audit logging, server-side grant list/export/disconnect controls, normalized manual activity ingestion, provider activity normalization, a file-backed normalized activity store primitive, an official read API client boundary, a feature-flagged official import worker, and an import adapter contract. The missing production backend pieces are route or scheduler wiring, worker-to-store persistence wiring, user-visible import history controls, and provider-specific production hardening.
+The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, a backend token exchange route, server-side runtime configuration, encrypted token vault primitives, file-backed encrypted grant persistence, sanitized OAuth audit logging, server-side grant list/export/disconnect controls, normalized manual activity ingestion, provider activity normalization, a file-backed normalized activity store primitive, an official read API client boundary, a disabled-by-default official import route with worker-to-store persistence, and an import adapter contract. The missing production backend pieces are scheduler policy, user-visible import history controls, and provider-specific production hardening.
 
 ## Adapter Contract
 
 Provider imports enter the product through `src/integrations/adapters.js`.
 
 - Manual import is the only adapter that can import activities today. It accepts user-supplied text and emits normalized local activities.
-- OAuth providers expose read-only adapter readiness, required scopes, guardrails, and blockers, but their import methods intentionally fail until the feature-flagged worker is wired into a production route or scheduler after provider review.
+- OAuth providers expose read-only adapter readiness, required scopes, guardrails, and blockers, but their browser-facing import methods intentionally fail until user-visible history controls and provider review are complete.
 - Adapter guardrails explicitly prohibit password collection, browser token storage, and automated engagement.
-- The local server exposes `/api/oauth/authorization?provider=twitter` for backend-generated PKCE state, `/oauth/callback` for verified callback intake, `/api/oauth/token-exchange` for server-side authorization-code exchange, and `/api/oauth/runtime` for sanitized backend readiness. The callback response stores no raw authorization code or token material.
+- The local server exposes `/api/oauth/authorization?provider=twitter` for backend-generated PKCE state, `/oauth/callback` for verified callback intake, `/api/oauth/token-exchange` for server-side authorization-code exchange, `/api/oauth/import` for disabled-by-default official read imports with normalized activity persistence, and `/api/oauth/runtime` for sanitized backend readiness. The callback and import responses store no raw authorization code, raw provider payload, or token material.
 - `src/integrations/tokenVault.js` provides the backend-only encrypted token envelope primitive for future OAuth token exchange wiring. It has no public endpoint, accepts only least-privilege catalog scopes, and keeps raw tokens out of grant summaries and browser code.
 - `src/integrations/tokenGrantStore.js` provides a file-backed persistence adapter for those encrypted envelopes. It stores only vault records, validates the store format on load, and updates the file through atomic replacement.
 - `src/integrations/oauthAuditLog.js` provides an append-only server-side audit event log for OAuth consent, callback, token exchange, grant export/disconnect/list, and official read attempts. It rejects token-like fields before persistence.
 - `src/integrations/oauthGrantControls.js` provides server-side grant controls for listing sanitized grants, exporting metadata-only grant summaries, and disconnecting accounts by deleting encrypted stored grants.
 - `src/integrations/oauthTokenExchange.js` defines the server-only authorization-code exchange boundary. It requires verified PKCE state, injected server-side client configuration, an encrypted token vault, and an injected `fetch`; it returns only a grant summary and never raw authorization codes, client secrets, or tokens.
-- `src/integrations/oauthRuntime.js` wires that boundary to server environment variables, a file-backed encrypted grant store, and no-secret readiness summaries.
+- `src/integrations/oauthRuntime.js` wires that boundary to server environment variables, a file-backed encrypted grant store, a normalized activity store, an explicit official-import feature flag, and no-secret readiness summaries.
 - `src/integrations/officialImportWorker.js` orchestrates backend-only stored-grant reads behind an explicit feature flag. It imports only consented endpoints, skips endpoints outside the grant scopes, stops on provider rate limits, and returns normalized activity summaries without token material.
-- `src/integrations/activityStore.js` provides a file-backed normalized activity store primitive for future import history. It accepts only sanitized normalized records, rejects token/code/password/private-message/raw payload fields, uses idempotent source/id upserts for import retries, and supports source/time-bounded deletion before production route wiring exists.
+- `src/integrations/activityStore.js` provides a file-backed normalized activity store primitive for import history. It accepts only sanitized normalized records, rejects token/code/password/private-message/raw payload fields, uses idempotent source/id upserts for import retries, and supports source/time-bounded deletion before user-visible controls exist.
 
-This keeps UI and planner code adapter-oriented without implying that real social API access is available before the worker is production-wired, reviewed, and backed by durable activity storage.
+This keeps UI and planner code adapter-oriented without implying that real social API access is user-facing before provider review and durable history controls are complete.
 
 ## Normalized Activity Contract
 
@@ -70,7 +70,7 @@ This advances the OAuth/API roadmap while keeping real credential collection, sc
 - It imports endpoints sequentially and stops on `429` responses, returning `retryAfterSeconds` when the provider supplies a `Retry-After` header.
 - It returns normalized activities plus source/type summaries that the portfolio map can consume.
 
-This is still not a user-facing live import feature. The next step is route or scheduler wiring with provider production review, worker-to-store persistence wiring, and user-visible import history controls.
+This is still not a user-facing live import feature. The next step is provider production review, scheduler policy, and user-visible import history controls.
 
 ## Normalized Activity Store
 
@@ -82,7 +82,7 @@ This is still not a user-facing live import feature. The next step is route or s
 - It upserts by `source` and `id`, making repeated official import attempts idempotent.
 - It supports source, type, and time-bounded reads/deletes so future user controls can export or remove imported history without touching OAuth grant storage.
 
-The store is not connected to a production import route yet. Official reads still require feature-flagged backend wiring, provider review, and user-visible history controls.
+The store is connected to the disabled-by-default backend import route for successful official read results. Official reads still require explicit backend feature-flag enablement, provider review, and user-visible history controls before production use.
 
 ## OAuth Token Exchange Boundary
 
@@ -94,7 +94,7 @@ The store is not connected to a production import route yet. Official reads stil
 - It persists token material only by calling the backend token vault and returns sanitized grant summaries.
 - It fails closed when providers return unsupported scopes, token errors, or malformed token payloads.
 
-This module is now exposed through `/api/oauth/token-exchange` behind server-side runtime configuration. The route consumes verified PKCE state, loads OAuth client IDs/secrets from environment variables, persists grants through the encrypted vault and file store, records sanitized audit events, and returns only sanitized summaries. The next production step is to wire the feature-flagged import worker into a backend route or scheduler with durable normalized activity storage.
+This module is now exposed through `/api/oauth/token-exchange` behind server-side runtime configuration. The route consumes verified PKCE state, loads OAuth client IDs/secrets from environment variables, persists grants through the encrypted vault and file store, records sanitized audit events, and returns only sanitized summaries. The next production step is to add user-visible controls and scheduler policy around the feature-flagged import route.
 
 ## OAuth Grant Controls
 
@@ -105,7 +105,7 @@ This module is now exposed through `/api/oauth/token-exchange` behind server-sid
 - `DELETE /api/oauth/grants` disconnects a provider account by deleting its encrypted server-side grant.
 - Responses never include access tokens, refresh tokens, authorization codes, or client secrets.
 
-These controls close the first disconnect/delete/export gap without enabling live social imports. Imports still require production route or scheduler wiring, durable normalized activity storage, and provider production review.
+These controls close the first disconnect/delete/export gap without enabling user-facing live social imports. Imports still require explicit backend feature-flag enablement, user-visible history controls, and provider production review.
 
 ## Portfolio Model Boundary
 
@@ -154,8 +154,7 @@ The same boundary now supports snapshot comparisons through `comparePortfolioMap
 
 ## Production Milestones
 
-1. Wire the feature-flagged official import worker to a backend route or scheduler.
-2. Connect successful official read results to the normalized activity store with user-visible import history controls.
-3. Scheduled imports with provider-specific rate-limit policy.
-4. Portfolio map generated from persisted normalized activities.
-5. Instagram/Facebook feasibility spikes based on official API limits.
+1. Add user-visible import history controls for stored normalized activities.
+2. Scheduled imports with provider-specific rate-limit policy.
+3. Portfolio map generated from persisted normalized activities.
+4. Instagram/Facebook feasibility spikes based on official API limits.

@@ -1,4 +1,5 @@
 import { join, resolve } from "node:path";
+import { createFileNormalizedActivityStore } from "./activityStore.js";
 import { createFileOAuthAuditLog } from "./oauthAuditLog.js";
 import { getProvider } from "./providers.js";
 import { createFileTokenGrantStore } from "./tokenGrantStore.js";
@@ -7,6 +8,8 @@ import { createInMemoryTokenVault } from "./tokenVault.js";
 const vaultKeyEnv = "BRAIN_HACKING_TOKEN_VAULT_KEY";
 const grantStorePathEnv = "BRAIN_HACKING_TOKEN_GRANT_STORE";
 const auditLogPathEnv = "BRAIN_HACKING_OAUTH_AUDIT_LOG";
+const activityStorePathEnv = "BRAIN_HACKING_ACTIVITY_STORE";
+const officialImportsEnabledEnv = "BRAIN_HACKING_OFFICIAL_IMPORTS_ENABLED";
 
 export function createServerOAuthRuntime({
   env = process.env,
@@ -15,14 +18,17 @@ export function createServerOAuthRuntime({
   now = Date.now,
   tokenVault,
   auditLog,
+  activityStore,
   randomBytes
 } = {}) {
   let cachedVault = tokenVault || null;
   let cachedAuditLog = auditLog || null;
+  let cachedActivityStore = activityStore || null;
 
   return {
     fetchImpl,
     now,
+    officialImportsEnabled: readBooleanEnv(env, officialImportsEnabledEnv),
 
     loadTokenVault() {
       if (cachedVault) {
@@ -51,6 +57,17 @@ export function createServerOAuthRuntime({
       return cachedAuditLog;
     },
 
+    loadActivityStore() {
+      if (cachedActivityStore) {
+        return cachedActivityStore;
+      }
+
+      cachedActivityStore = createFileNormalizedActivityStore({
+        filePath: resolveActivityStorePath(env, rootDir)
+      });
+      return cachedActivityStore;
+    },
+
     getClientConfig(providerId) {
       const provider = getProvider(providerId);
       if (provider.mode !== "oauth-pkce") {
@@ -72,13 +89,16 @@ export function summarizeServerOAuthRuntime(env = process.env, rootDir = process
   return {
     status: env[vaultKeyEnv] ? "configured" : "requires-server-configuration",
     requiredEnv: [vaultKeyEnv],
-    optionalEnv: [grantStorePathEnv, auditLogPathEnv],
+    optionalEnv: [grantStorePathEnv, auditLogPathEnv, activityStorePathEnv, officialImportsEnabledEnv],
+    officialImportsEnabled: readBooleanEnv(env, officialImportsEnabledEnv),
     grantStorePath: resolveGrantStorePath(env, rootDir),
     auditLogPath: resolveAuditLogPath(env, rootDir),
+    activityStorePath: resolveActivityStorePath(env, rootDir),
     guardrails: [
       "load OAuth client configuration only from server environment variables",
       "persist token grants as encrypted server-side envelopes",
       "record sanitized OAuth audit events without token material",
+      "keep official imports disabled unless the backend feature flag is explicitly enabled",
       "do not expose authorization codes, client secrets, or tokens in route responses"
     ]
   };
@@ -100,4 +120,13 @@ function resolveGrantStorePath(env, rootDir) {
 function resolveAuditLogPath(env, rootDir) {
   const configured = String(env?.[auditLogPathEnv] || "").trim();
   return configured ? resolve(configured) : join(rootDir, ".brain-hacking", "oauth-audit-log.json");
+}
+
+function resolveActivityStorePath(env, rootDir) {
+  const configured = String(env?.[activityStorePathEnv] || "").trim();
+  return configured ? resolve(configured) : join(rootDir, ".brain-hacking", "activities.json");
+}
+
+function readBooleanEnv(env, name) {
+  return ["1", "true", "yes"].includes(String(env?.[name] || "").trim().toLowerCase());
 }

@@ -7,6 +7,7 @@ import { buildAuthorizationRequest, createOAuthState, summarizeConsent } from ".
 import { parseOAuthCallback } from "./src/integrations/oauthCallback.js";
 import { exchangeAuthorizationCodeForGrant } from "./src/integrations/oauthTokenExchange.js";
 import { createServerOAuthRuntime, summarizeServerOAuthRuntime } from "./src/integrations/oauthRuntime.js";
+import { createOfficialImportWorker } from "./src/integrations/officialImportWorker.js";
 import {
   disconnectOAuthGrant,
   exportOAuthGrantSummaries,
@@ -65,6 +66,11 @@ export function createRequestHandler(options = {}) {
 
       if (parsed.pathname === "/api/oauth/grants/export") {
         handleOAuthGrantExport(parsed, res, oauthRuntime, now);
+        return;
+      }
+
+      if (parsed.pathname === "/api/oauth/import") {
+        await handleOfficialOAuthImport(req, res, oauthRuntime, now);
         return;
       }
 
@@ -153,6 +159,41 @@ function handleOAuthGrantExport(url, res, oauthRuntime, now) {
       now
     })
   );
+}
+
+async function handleOfficialOAuthImport(req, res, oauthRuntime, now) {
+  if (req.method !== "POST") {
+    throw new Error("Official OAuth import route requires POST.");
+  }
+
+  const payload = await readJsonBody(req);
+  const providerId = normalizeRouteValue(payload.providerId, "Official import provider id");
+  const accountId = normalizeRouteValue(payload.accountId, "Official import account id");
+  const worker = createOfficialImportWorker({
+    enabled: oauthRuntime.officialImportsEnabled === true,
+    tokenVault: oauthRuntime.officialImportsEnabled === true ? oauthRuntime.loadTokenVault() : undefined,
+    auditLog: oauthRuntime.loadAuditLog?.(),
+    fetchImpl: oauthRuntime.fetchImpl,
+    now
+  });
+  const result = await worker.runImport({
+    providerId,
+    accountId,
+    endpointIds: payload.endpointIds,
+    limit: payload.limit
+  });
+  const persistence = persistOfficialImportActivities(result, oauthRuntime);
+
+  sendJson(res, 200, {
+    ok: true,
+    ...sanitizeOfficialImportResult(result),
+    persistence,
+    guardrails: [
+      "official OAuth read imports must be enabled by the backend feature flag",
+      "provider reads use stored server-side grants only",
+      "route responses include normalized summaries, not token material or raw provider payloads"
+    ]
+  });
 }
 
 async function handleOAuthAuthorization(url, res, stateStore, oauthRuntime, now) {
@@ -289,6 +330,70 @@ async function handleOAuthTokenExchange(req, res, stateStore, oauthRuntime, now)
       "response contains only sanitized grant metadata"
     ]
   });
+}
+
+function persistOfficialImportActivities(result, oauthRuntime) {
+  const shouldPersist =
+    ["official-import-succeeded", "official-import-rate-limited"].includes(result.status) && result.activities.length;
+  if (!shouldPersist) {
+    return {
+      status: "normalized-activities-not-persisted",
+      reason: result.status,
+      activityCount: result.activities.length
+    };
+  }
+
+  const saveResult = oauthRuntime.loadActivityStore().saveActivities(result.activities);
+  appendOAuthAudit(oauthRuntime, {
+    action: "official-read-import-attempted",
+    providerId: result.providerId,
+    accountId: result.accountId,
+    status: "official-import-activities-persisted",
+    metadata: {
+      importStatus: result.status,
+      inserted: saveResult.inserted,
+      updated: saveResult.updated,
+      total: saveResult.total
+    }
+  });
+
+  return {
+    status: "normalized-activities-persisted",
+    inserted: saveResult.inserted,
+    updated: saveResult.updated,
+    total: saveResult.total,
+    summary: saveResult.summary
+  };
+}
+
+function sanitizeOfficialImportResult(result) {
+  const {
+    activities,
+    summary,
+    status,
+    providerId,
+    accountId,
+    importMode,
+    importedAt,
+    importedEndpoints,
+    skippedEndpoints,
+    failedEndpointId,
+    retryAfterSeconds
+  } = result;
+
+  return {
+    status,
+    providerId,
+    accountId,
+    importMode,
+    importedAt,
+    importedEndpoints,
+    skippedEndpoints,
+    failedEndpointId,
+    retryAfterSeconds,
+    importedActivityCount: activities.length,
+    importSummary: summary
+  };
 }
 
 async function readJsonBody(req) {

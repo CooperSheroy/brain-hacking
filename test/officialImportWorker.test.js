@@ -164,5 +164,6 @@ test("official import worker readiness keeps production work explicit", () => {
   const readiness = summarizeOfficialImportWorkerReadiness();
 
   assert.equal(readiness.status, "feature-flagged-import-worker-ready");
+  assert.ok(readiness.remainingBeforeProduction.some((item) => item.includes("disabled until explicit operator enablement")));
   assert.ok(readiness.remainingBeforeProduction.includes("complete provider-specific production permission review"));
 });

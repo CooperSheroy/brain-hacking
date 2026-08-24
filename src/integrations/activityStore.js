@@ -108,7 +108,6 @@ export function summarizeNormalizedActivityStoreReadiness() {
       "supports source and time-bounded deletion before production import wiring"
     ],
     remainingBeforeImports: [
-      "wire the feature-flagged official import worker to save successful read results",
       "add user-visible import history controls",
       "complete provider-specific production permission review"
     ]
