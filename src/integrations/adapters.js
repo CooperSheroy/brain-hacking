@@ -3,7 +3,7 @@ import { getProvider, getProviderIds, providerCatalog } from "./providers.js";
 
 const oauthImportBlockers = [
   "explicit backend feature-flag enablement for the official import route",
-  "user-visible import history controls",
+  "browser UI for import history controls",
   "provider-specific production permission review"
 ];
 
@@ -74,7 +74,7 @@ function createOfficialOAuthAdapter(provider) {
     supportedSignals: [...provider.supportedSignals],
     requiredScopes: [...provider.defaultScopes],
     blockers: [...oauthImportBlockers],
-    nextRequiredStep: "Add user-visible import history controls and complete provider review before enabling stored-grant imports.",
+    nextRequiredStep: "Add browser import history UI and complete provider review before enabling stored-grant imports.",
     guardrails: [
       "request least-privilege read scopes",
       "store tokens server-side only",
@@ -82,7 +82,7 @@ function createOfficialOAuthAdapter(provider) {
     ],
     importActivities() {
       throw new Error(
-        `${provider.label} imports require user-visible history controls and provider permission review before user-facing stored-grant imports are enabled.`
+        `${provider.label} imports require browser history UI and provider permission review before user-facing stored-grant imports are enabled.`
       );
     }
   };

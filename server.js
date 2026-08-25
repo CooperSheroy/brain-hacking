@@ -9,6 +9,11 @@ import { exchangeAuthorizationCodeForGrant } from "./src/integrations/oauthToken
 import { createServerOAuthRuntime, summarizeServerOAuthRuntime } from "./src/integrations/oauthRuntime.js";
 import { createOfficialImportWorker } from "./src/integrations/officialImportWorker.js";
 import {
+  deleteImportHistory,
+  exportImportHistory,
+  listImportHistory
+} from "./src/integrations/activityHistoryControls.js";
+import {
   disconnectOAuthGrant,
   exportOAuthGrantSummaries,
   listOAuthGrantSummaries
@@ -74,6 +79,16 @@ export function createRequestHandler(options = {}) {
         return;
       }
 
+      if (parsed.pathname === "/api/oauth/import-history") {
+        await handleOAuthImportHistory(req, parsed, res, oauthRuntime, now);
+        return;
+      }
+
+      if (parsed.pathname === "/api/oauth/import-history/export") {
+        handleOAuthImportHistoryExport(parsed, res, oauthRuntime, now);
+        return;
+      }
+
       if (parsed.pathname === "/oauth/callback") {
         handleOAuthCallback(requestUrl, res, stateStore, oauthRuntime, now);
         return;
@@ -103,6 +118,53 @@ function resolvePathForRoot(url, rootDir) {
     return join(rootDir, "index.html");
   }
   return join(rootDir, clean);
+}
+
+async function handleOAuthImportHistory(req, url, res, oauthRuntime, now) {
+  if (req.method === "GET") {
+    sendJson(
+      res,
+      200,
+      listImportHistory({
+        activityStore: oauthRuntime.loadActivityStore(),
+        auditLog: oauthRuntime.loadAuditLog?.(),
+        ...readHistoryFiltersFromUrl(url),
+        now
+      })
+    );
+    return;
+  }
+
+  if (req.method === "DELETE") {
+    const payload = await readJsonBody(req);
+    sendJson(
+      res,
+      200,
+      deleteImportHistory({
+        activityStore: oauthRuntime.loadActivityStore(),
+        auditLog: oauthRuntime.loadAuditLog?.(),
+        ...readHistoryFiltersFromUrl(url),
+        ...readHistoryFiltersFromPayload(payload),
+        now
+      })
+    );
+    return;
+  }
+
+  throw new Error("OAuth import history route requires GET or DELETE.");
+}
+
+function handleOAuthImportHistoryExport(url, res, oauthRuntime, now) {
+  sendJson(
+    res,
+    200,
+    exportImportHistory({
+      activityStore: oauthRuntime.loadActivityStore(),
+      auditLog: oauthRuntime.loadAuditLog?.(),
+      ...readHistoryFiltersFromUrl(url),
+      now
+    })
+  );
 }
 
 async function handleOAuthGrants(req, url, res, oauthRuntime, now) {
@@ -422,6 +484,28 @@ function normalizeRouteValue(value, label) {
     throw new Error(`${label} is required.`);
   }
   return normalized;
+}
+
+function readHistoryFiltersFromUrl(url) {
+  return {
+    providerId: url.searchParams.get("provider") || url.searchParams.get("providerId") || undefined,
+    source: url.searchParams.get("source") || undefined,
+    type: url.searchParams.get("type") || undefined,
+    since: url.searchParams.get("since") || undefined,
+    until: url.searchParams.get("until") || undefined,
+    limit: url.searchParams.get("limit") || undefined
+  };
+}
+
+function readHistoryFiltersFromPayload(payload = {}) {
+  return {
+    providerId: payload.providerId,
+    source: payload.source,
+    type: payload.type,
+    since: payload.since,
+    until: payload.until,
+    limit: payload.limit
+  };
 }
 
 function appendOAuthAudit(oauthRuntime, event) {

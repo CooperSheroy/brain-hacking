@@ -9,6 +9,9 @@ const allowedActions = new Set([
   "grant-listed",
   "grant-exported",
   "grant-disconnected",
+  "import-history-listed",
+  "import-history-exported",
+  "import-history-deleted",
   "official-read-import-attempted"
 ]);
 const tokenLikeFields = [

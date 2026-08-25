@@ -335,6 +335,91 @@ test("server official OAuth import route persists normalized activities when ena
   }
 });
 
+test("server exposes sanitized import history list, export, and delete controls", async () => {
+  const auditLog = createMemoryOAuthAuditLog({
+    now: () => Date.parse("2026-08-25T08:00:00.000Z")
+  });
+  const storedActivities = [
+    {
+      id: "twitter-liked-123",
+      source: "twitter",
+      type: "like",
+      label: "Deep work systems",
+      weight: 1,
+      capturedAt: "2026-08-20T09:00:00.000Z",
+      permissionScope: "tweet.read"
+    },
+    {
+      id: "manual-1",
+      source: "manual",
+      type: "topic",
+      label: "Evidence-based fitness",
+      weight: 1,
+      capturedAt: "2026-08-21T09:00:00.000Z"
+    }
+  ];
+  const activityStore = {
+    listActivities(filters = {}) {
+      return storedActivities.filter((activity) => !filters.source || activity.source === filters.source);
+    },
+    deleteActivities(filters = {}) {
+      const matched = storedActivities.filter((activity) => !filters.source || activity.source === filters.source);
+      return {
+        status: "normalized-activities-deleted",
+        deleted: matched.length,
+        total: storedActivities.length - matched.length,
+        summary: {
+          total: storedActivities.length - matched.length,
+          bySource: { manual: 1 },
+          byType: { topic: 1 }
+        }
+      };
+    }
+  };
+  const server = createServer(
+    createRequestHandler({
+      now: () => Date.parse("2026-08-25T08:00:00.000Z"),
+      oauthRuntime: {
+        loadActivityStore: () => activityStore,
+        loadAuditLog: () => auditLog
+      }
+    })
+  );
+  await listen(server);
+
+  try {
+    const baseUrl = `http://127.0.0.1:${server.address().port}`;
+    const listResponse = await fetch(`${baseUrl}/api/oauth/import-history?provider=twitter`);
+    const listing = await listResponse.json();
+    const exportResponse = await fetch(`${baseUrl}/api/oauth/import-history/export`);
+    const exported = await exportResponse.json();
+    const deleteResponse = await fetch(`${baseUrl}/api/oauth/import-history`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ source: "twitter" })
+    });
+    const deleted = await deleteResponse.json();
+
+    assert.equal(listResponse.status, 200);
+    assert.equal(listing.status, "import-history-list-ready");
+    assert.equal(listing.activities.length, 1);
+    assert.equal(listing.activities[0].id, "twitter-liked-123");
+    assert.equal(exportResponse.status, 200);
+    assert.equal(exported.status, "import-history-export-ready");
+    assert.equal(exported.activities.length, 2);
+    assert.equal(JSON.stringify(exported).includes("server-side-access-token"), false);
+    assert.equal(deleteResponse.status, 200);
+    assert.equal(deleted.status, "import-history-delete-complete");
+    assert.equal(deleted.deleted, 1);
+    assert.deepEqual(
+      auditLog.list().map((event) => event.action),
+      ["import-history-listed", "import-history-exported", "import-history-deleted"]
+    );
+  } finally {
+    await close(server);
+  }
+});
+
 test("server rejects OAuth callbacks that lack server-created state", async () => {
   const server = createServer(createRequestHandler({ stateStore: new Map() }));
   await listen(server);
