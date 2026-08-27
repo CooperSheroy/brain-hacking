@@ -98,6 +98,32 @@
           </div>
           <textarea id="signalsInput" rows="9" placeholder="Example: productivity systems, gym routines, recipes, startup advice, outrage politics"></textarea>
           <div id="signalChips" class="chip-row"></div>
+          <section class="history-panel" aria-label="Import history">
+            <div class="panel-heading">
+              <h3>Import History</h3>
+              <span id="historyStatus" class="badge">Not loaded</span>
+            </div>
+            <form id="historyControls" class="history-controls">
+              <label>
+                Source
+                <select id="historyProviderSelect" name="provider"></select>
+              </label>
+              <label>
+                Type
+                <input id="historyTypeInput" name="type" type="text" placeholder="like, topic, follow" />
+              </label>
+              <label>
+                Limit
+                <input id="historyLimitInput" name="limit" type="number" min="1" max="100" value="25" />
+              </label>
+            </form>
+            <div class="history-actions">
+              <button id="historyRefreshButton" type="button">Refresh</button>
+              <button id="historyExportButton" type="button">Export</button>
+              <button id="historyDeleteButton" type="button" disabled>Delete Filtered</button>
+            </div>
+            <div id="historyList" class="history-list"></div>
+          </section>
         </section>
 
         <section id="mapView" class="view" aria-labelledby="map-title">

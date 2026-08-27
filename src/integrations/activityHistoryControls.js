@@ -123,7 +123,7 @@ export function summarizeImportHistoryControlsReadiness() {
     ],
     guardrails: [...guardrails],
     remainingBeforeProduction: [
-      "add browser UI around the history control routes",
+      "harden browser history retention UX",
       "complete provider-specific production permission review",
       "define scheduled import retention defaults"
     ]

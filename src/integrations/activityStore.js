@@ -108,7 +108,7 @@ export function summarizeNormalizedActivityStoreReadiness() {
       "supports source and time-bounded deletion before production import wiring"
     ],
     remainingBeforeImports: [
-      "add browser UI for import history controls",
+      "harden browser history retention UX",
       "complete provider-specific production permission review"
     ]
   };

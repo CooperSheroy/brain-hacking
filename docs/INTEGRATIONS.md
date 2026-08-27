@@ -15,16 +15,16 @@ Provider catalog
   -> Feed/personality analysis
 ```
 
-The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, a backend token exchange route, server-side runtime configuration, encrypted token vault primitives, file-backed encrypted grant persistence, sanitized OAuth audit logging, server-side grant list/export/disconnect controls, normalized manual activity ingestion, provider activity normalization, a file-backed normalized activity store primitive, server-side import history list/export/delete controls, an official read API client boundary, a disabled-by-default official import route with worker-to-store persistence, and an import adapter contract. The missing production backend pieces are scheduler policy, browser history UI, and provider-specific production hardening.
+The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, a backend token exchange route, server-side runtime configuration, encrypted token vault primitives, file-backed encrypted grant persistence, sanitized OAuth audit logging, server-side grant list/export/disconnect controls, normalized manual activity ingestion, provider activity normalization, a file-backed normalized activity store primitive, server-side import history list/export/delete controls, a browser import history surface for filtered list/export/delete, an official read API client boundary, a disabled-by-default official import route with worker-to-store persistence, and an import adapter contract. The missing production backend pieces are scheduler policy, history UX hardening, and provider-specific production hardening.
 
 ## Adapter Contract
 
 Provider imports enter the product through `src/integrations/adapters.js`.
 
 - Manual import is the only adapter that can import activities today. It accepts user-supplied text and emits normalized local activities.
-- OAuth providers expose read-only adapter readiness, required scopes, guardrails, and blockers, but their browser-facing import methods intentionally fail until browser history UI and provider review are complete.
+- OAuth providers expose read-only adapter readiness, required scopes, guardrails, and blockers, but their browser-facing import methods intentionally fail until retention UX hardening and provider review are complete.
 - Adapter guardrails explicitly prohibit password collection, browser token storage, and automated engagement.
-- The local server exposes `/api/oauth/authorization?provider=twitter` for backend-generated PKCE state, `/oauth/callback` for verified callback intake, `/api/oauth/token-exchange` for server-side authorization-code exchange, `/api/oauth/import` for disabled-by-default official read imports with normalized activity persistence, `/api/oauth/import-history` plus `/api/oauth/import-history/export` for normalized history controls, and `/api/oauth/runtime` for sanitized backend readiness. The callback and import responses store no raw authorization code, raw provider payload, or token material.
+- The local server exposes `/api/oauth/authorization?provider=twitter` for backend-generated PKCE state, `/oauth/callback` for verified callback intake, `/api/oauth/token-exchange` for server-side authorization-code exchange, `/api/oauth/import` for disabled-by-default official read imports with normalized activity persistence, `/api/oauth/import-history` plus `/api/oauth/import-history/export` for normalized history controls, and `/api/oauth/runtime` for sanitized backend readiness. The browser history panel calls those history controls with explicit provider/type filters for deletion. The callback and import responses store no raw authorization code, raw provider payload, or token material.
 - `src/integrations/tokenVault.js` provides the backend-only encrypted token envelope primitive for future OAuth token exchange wiring. It has no public endpoint, accepts only least-privilege catalog scopes, and keeps raw tokens out of grant summaries and browser code.
 - `src/integrations/tokenGrantStore.js` provides a file-backed persistence adapter for those encrypted envelopes. It stores only vault records, validates the store format on load, and updates the file through atomic replacement.
 - `src/integrations/oauthAuditLog.js` provides an append-only server-side audit event log for OAuth consent, callback, token exchange, grant export/disconnect/list, import history controls, and official read attempts. It rejects token-like fields before persistence.
@@ -71,7 +71,7 @@ This advances the OAuth/API roadmap while keeping real credential collection, sc
 - It imports endpoints sequentially and stops on `429` responses, returning `retryAfterSeconds` when the provider supplies a `Retry-After` header.
 - It returns normalized activities plus source/type summaries that the portfolio map can consume.
 
-This is still not a user-facing live import feature. The next step is provider production review, scheduler policy, and browser UI around the import history controls.
+This is still not a user-facing live import feature. The next step is provider production review, scheduler policy, and history retention UX hardening.
 
 ## Normalized Activity Store
 
@@ -83,7 +83,7 @@ This is still not a user-facing live import feature. The next step is provider p
 - It upserts by `source` and `id`, making repeated official import attempts idempotent.
 - It supports source, type, and time-bounded reads/deletes so future user controls can export or remove imported history without touching OAuth grant storage.
 
-The store is connected to the disabled-by-default backend import route for successful official read results, plus server-side controls for list/export/delete. Official reads still require explicit backend feature-flag enablement, provider review, and browser history UI before production use.
+The store is connected to the disabled-by-default backend import route for successful official read results, plus server-side and browser controls for list/export/delete. Official reads still require explicit backend feature-flag enablement, provider review, and retention policy hardening before production use.
 
 ## Import History Controls
 
@@ -93,6 +93,7 @@ The store is connected to the disabled-by-default backend import route for succe
 - `GET /api/oauth/import-history/export` returns matching normalized history plus a retention note for user export flows.
 - `DELETE /api/oauth/import-history` removes stored activities only when the request includes at least one source, type, or time boundary enforced by the activity store.
 - All operations append sanitized audit events and reject token-like fields before returning records.
+- `src/integrations/importHistoryUi.js` keeps browser-side route construction, bounded limits, provider options, and guarded delete payloads separate from rendering.
 
 These controls advance retention/export/delete readiness without enabling live imports, collecting social credentials, or exposing raw provider payloads.
 
@@ -166,7 +167,7 @@ The same boundary now supports snapshot comparisons through `comparePortfolioMap
 
 ## Production Milestones
 
-1. Add browser UI around stored normalized activity history controls.
-2. Scheduled imports with provider-specific rate-limit policy.
-3. Portfolio map generated from persisted normalized activities.
+1. Scheduled imports with provider-specific rate-limit policy.
+2. Portfolio map generated from persisted normalized activities.
+3. History UX hardening for retention windows, confirmations, and empty states.
 4. Instagram/Facebook feasibility spikes based on official API limits.

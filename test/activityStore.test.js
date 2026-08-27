@@ -164,5 +164,5 @@ test("file normalized activity store readiness keeps official imports gated", ()
 
   assert.equal(readiness.status, "normalized-activity-store-ready");
   assert.ok(readiness.guardrails.some((guardrail) => guardrail.includes("normalized activity records only")));
-  assert.ok(readiness.remainingBeforeImports.includes("add browser UI for import history controls"));
+  assert.ok(readiness.remainingBeforeImports.includes("harden browser history retention UX"));
 });

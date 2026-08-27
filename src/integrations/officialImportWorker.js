@@ -112,7 +112,7 @@ export function summarizeOfficialImportWorkerReadiness() {
     remainingBeforeProduction: [
       "keep the backend import route disabled until explicit operator enablement and provider review",
       "complete provider-specific production permission review",
-      "add browser UI for import history controls"
+      "harden browser history retention UX"
     ]
   };
 }

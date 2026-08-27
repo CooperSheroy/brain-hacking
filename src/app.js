@@ -1,6 +1,14 @@
 import { analyzeSignals, createPlan, goals } from "./feedPlanner.js";
 import { getImportAdapter, summarizeAdapterReadiness } from "./integrations/adapters.js";
 import { summarizeConsent } from "./integrations/oauth.js";
+import {
+  createImportHistoryDeleteBody,
+  createImportHistoryFilters,
+  createImportHistoryUrl,
+  createProviderOptions,
+  isHistoryDeleteEnabled,
+  summarizeHistoryResponse
+} from "./integrations/importHistoryUi.js";
 import { normalizeManualSignals, summarizeActivities } from "./integrations/normalizedActivity.js";
 import { getProvider, providerCatalog } from "./integrations/providers.js";
 import { buildPortfolioMap } from "./portfolioModel.js";
@@ -11,7 +19,12 @@ const state = {
   intensity: 3,
   avoid: "",
   signals: "discipline systems, gym routines, high protein recipes, deep work, founder advice",
-  selectedProviderId: "twitter"
+  selectedProviderId: "twitter",
+  historyProviderId: "all",
+  historyType: "",
+  historyLimit: 25,
+  historyStatus: "Not loaded",
+  historyActivities: []
 };
 
 const goalSelect = document.querySelector("#goalSelect");
@@ -28,9 +41,20 @@ const portfolioGrid = document.querySelector("#portfolioGrid");
 const viewTitle = document.querySelector("#viewTitle");
 const integrationDetail = document.querySelector("#integrationDetail");
 const selectedProviderBadge = document.querySelector("#selectedProviderBadge");
+const historyProviderSelect = document.querySelector("#historyProviderSelect");
+const historyTypeInput = document.querySelector("#historyTypeInput");
+const historyLimitInput = document.querySelector("#historyLimitInput");
+const historyRefreshButton = document.querySelector("#historyRefreshButton");
+const historyExportButton = document.querySelector("#historyExportButton");
+const historyDeleteButton = document.querySelector("#historyDeleteButton");
+const historyStatus = document.querySelector("#historyStatus");
+const historyList = document.querySelector("#historyList");
 
 function init() {
   goalSelect.innerHTML = goals.map((goal) => `<option value="${goal.id}">${goal.label}</option>`).join("");
+  historyProviderSelect.innerHTML = createProviderOptions()
+    .map((provider) => `<option value="${provider.value}">${provider.label}</option>`)
+    .join("");
   connectionList.innerHTML = providerCatalog
     .map(
       (platform) => `
@@ -69,6 +93,13 @@ function bindEvents() {
 
   document.querySelector("#regenerateButton").addEventListener("click", renderPlan);
   document.querySelector("#exportButton").addEventListener("click", exportPlan);
+  document.querySelector("#historyControls").addEventListener("input", () => {
+    readHistoryControls();
+    renderImportHistory();
+  });
+  historyRefreshButton.addEventListener("click", refreshImportHistory);
+  historyExportButton.addEventListener("click", exportImportHistory);
+  historyDeleteButton.addEventListener("click", deleteImportHistory);
 
   connectionList.addEventListener("click", (event) => {
     const button = event.target.closest("[data-provider]");
@@ -94,6 +125,7 @@ function render() {
   renderPlan();
   renderSignals();
   renderIntegrationDetail();
+  renderImportHistory();
 }
 
 function renderConnections() {
@@ -221,6 +253,94 @@ function renderIntegrationDetail() {
   `;
 }
 
+function renderImportHistory() {
+  const filters = getHistoryFilters();
+  historyProviderSelect.value = state.historyProviderId;
+  historyTypeInput.value = state.historyType;
+  historyLimitInput.value = state.historyLimit;
+  historyStatus.textContent = state.historyStatus;
+  historyDeleteButton.disabled = !isHistoryDeleteEnabled(filters);
+  historyList.innerHTML = state.historyActivities.length
+    ? state.historyActivities
+        .map(
+          (activity) => `
+            <article class="history-item">
+              <div>
+                <strong>${escapeHtml(activity.label)}</strong>
+                <span>${escapeHtml(activity.source)} &middot; ${escapeHtml(activity.type)} &middot; ${formatDate(activity.capturedAt)}</span>
+              </div>
+              <span>${escapeHtml(activity.permissionScope || "local")}</span>
+            </article>
+          `
+        )
+        .join("")
+    : `<p class="empty-state">${escapeHtml(state.historyStatus)}</p>`;
+}
+
+async function refreshImportHistory() {
+  readHistoryControls();
+  state.historyStatus = "Loading history";
+  renderImportHistory();
+
+  try {
+    const response = await fetch(createImportHistoryUrl("/api/oauth/import-history", getHistoryFilters()));
+    const payload = await response.json();
+    assertHistoryResponse(response, payload);
+    state.historyActivities = payload.activities || [];
+    state.historyStatus = summarizeHistoryResponse(payload);
+  } catch (error) {
+    state.historyActivities = [];
+    state.historyStatus = error.message;
+  }
+
+  renderImportHistory();
+}
+
+async function exportImportHistory() {
+  readHistoryControls();
+  try {
+    const response = await fetch(createImportHistoryUrl("/api/oauth/import-history/export", getHistoryFilters()));
+    const payload = await response.json();
+    assertHistoryResponse(response, payload);
+    downloadJson(payload, "brain-hacking-import-history.json");
+    state.historyStatus = summarizeHistoryResponse(payload);
+  } catch (error) {
+    state.historyStatus = error.message;
+  }
+  renderImportHistory();
+}
+
+async function deleteImportHistory() {
+  readHistoryControls();
+  const filters = getHistoryFilters();
+  let body;
+  try {
+    body = createImportHistoryDeleteBody(filters);
+  } catch (error) {
+    state.historyStatus = error.message;
+    renderImportHistory();
+    return;
+  }
+  if (!confirm(`Delete import history for ${formatDeleteBoundary(body)}?`)) {
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/oauth/import-history", {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    const payload = await response.json();
+    assertHistoryResponse(response, payload);
+    state.historyActivities = [];
+    state.historyStatus = `Deleted ${payload.deleted || 0} records`;
+  } catch (error) {
+    state.historyStatus = error.message;
+  }
+  renderImportHistory();
+}
+
 function exportPlan() {
   const plan = createPlan(state);
   const provider = getProvider(state.selectedProviderId);
@@ -240,10 +360,34 @@ function exportPlan() {
     portfolio: buildPortfolioMap(localActivities, state.goalId),
     plan
   };
+  downloadJson(payload, "brain-hacking-plan.json");
+}
+
+function readHistoryControls() {
+  state.historyProviderId = historyProviderSelect.value;
+  state.historyType = historyTypeInput.value;
+  state.historyLimit = Number(historyLimitInput.value);
+}
+
+function getHistoryFilters() {
+  return createImportHistoryFilters({
+    providerId: state.historyProviderId,
+    type: state.historyType,
+    limit: state.historyLimit
+  });
+}
+
+function assertHistoryResponse(response, payload) {
+  if (!response.ok || payload?.ok === false) {
+    throw new Error(payload?.error || "Import history request failed.");
+  }
+}
+
+function downloadJson(payload, filename) {
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = "brain-hacking-plan.json";
+  link.download = filename;
   link.click();
   URL.revokeObjectURL(link.href);
 }
@@ -263,6 +407,18 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function formatDate(value) {
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) {
+    return "";
+  }
+  return timestamp.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function formatDeleteBoundary(body) {
+  return [body.source, body.type].filter(Boolean).join(" / ");
 }
 
 init();

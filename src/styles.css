@@ -145,8 +145,10 @@ button:disabled {
 .strategy-panel,
 .timeline-panel,
 .integration-panel,
+.history-panel,
 .adapter-card,
-.scope-card {
+.scope-card,
+.history-item {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.88);
@@ -211,7 +213,8 @@ button:disabled {
 .control-panel,
 .strategy-panel,
 .timeline-panel,
-.integration-panel {
+.integration-panel,
+.history-panel {
   padding: 18px;
   box-shadow: var(--shadow);
 }
@@ -229,6 +232,7 @@ label {
 }
 
 select,
+input[type="number"],
 input[type="text"],
 textarea {
   width: 100%;
@@ -268,7 +272,8 @@ input[type="range"] {
 
 .prompt-list,
 .timeline-list,
-.portfolio-grid {
+.portfolio-grid,
+.history-list {
   display: grid;
   gap: 12px;
 }
@@ -425,6 +430,48 @@ input[type="range"] {
   line-height: 1.45;
 }
 
+.history-controls {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(140px, 1fr) 120px;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+}
+
+.history-item div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.history-item strong {
+  overflow-wrap: anywhere;
+}
+
+.history-item span,
+.empty-state {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.empty-state {
+  margin: 0;
+}
+
 meter {
   width: 100%;
   height: 12px;
@@ -444,7 +491,8 @@ meter {
   .prompt-list,
   .adapter-card,
   .scope-grid,
-  .portfolio-grid {
+  .portfolio-grid,
+  .history-controls {
     grid-template-columns: 1fr;
   }
 

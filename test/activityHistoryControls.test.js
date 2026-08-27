@@ -149,5 +149,5 @@ test("import history readiness describes remaining production work", () => {
 
   assert.equal(readiness.status, "import-history-controls-ready");
   assert.ok(readiness.supportedOperations.includes("export normalized import history"));
-  assert.ok(readiness.remainingBeforeProduction.includes("add browser UI around the history control routes"));
+  assert.ok(readiness.remainingBeforeProduction.includes("harden browser history retention UX"));
 });
