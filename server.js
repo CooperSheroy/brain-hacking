@@ -18,6 +18,12 @@ import {
   exportOAuthGrantSummaries,
   listOAuthGrantSummaries
 } from "./src/integrations/oauthGrantControls.js";
+import {
+  compareLatestPortfolioHistory,
+  deletePortfolioHistory,
+  exportPortfolioHistory,
+  listPortfolioHistory
+} from "./src/portfolioHistoryControls.js";
 
 const root = process.cwd();
 const port = Number(process.env.PORT || 4175);
@@ -86,6 +92,21 @@ export function createRequestHandler(options = {}) {
 
       if (parsed.pathname === "/api/oauth/import-history/export") {
         handleOAuthImportHistoryExport(parsed, res, oauthRuntime, now);
+        return;
+      }
+
+      if (parsed.pathname === "/api/portfolio/history") {
+        await handlePortfolioHistory(req, parsed, res, oauthRuntime, now);
+        return;
+      }
+
+      if (parsed.pathname === "/api/portfolio/history/export") {
+        handlePortfolioHistoryExport(parsed, res, oauthRuntime, now);
+        return;
+      }
+
+      if (parsed.pathname === "/api/portfolio/history/compare") {
+        handlePortfolioHistoryCompare(parsed, res, oauthRuntime, now);
         return;
       }
 
@@ -162,6 +183,66 @@ function handleOAuthImportHistoryExport(url, res, oauthRuntime, now) {
       activityStore: oauthRuntime.loadActivityStore(),
       auditLog: oauthRuntime.loadAuditLog?.(),
       ...readHistoryFiltersFromUrl(url),
+      now
+    })
+  );
+}
+
+async function handlePortfolioHistory(req, url, res, oauthRuntime, now) {
+  if (req.method === "GET") {
+    sendJson(
+      res,
+      200,
+      listPortfolioHistory({
+        portfolioHistoryStore: oauthRuntime.loadPortfolioHistoryStore(),
+        auditLog: oauthRuntime.loadAuditLog?.(),
+        ...readPortfolioHistoryFiltersFromUrl(url),
+        now
+      })
+    );
+    return;
+  }
+
+  if (req.method === "DELETE") {
+    const payload = await readJsonBody(req);
+    sendJson(
+      res,
+      200,
+      deletePortfolioHistory({
+        portfolioHistoryStore: oauthRuntime.loadPortfolioHistoryStore(),
+        auditLog: oauthRuntime.loadAuditLog?.(),
+        ...readPortfolioHistoryFiltersFromUrl(url),
+        ...readPortfolioHistoryFiltersFromPayload(payload),
+        now
+      })
+    );
+    return;
+  }
+
+  throw new Error("Portfolio history route requires GET or DELETE.");
+}
+
+function handlePortfolioHistoryExport(url, res, oauthRuntime, now) {
+  sendJson(
+    res,
+    200,
+    exportPortfolioHistory({
+      portfolioHistoryStore: oauthRuntime.loadPortfolioHistoryStore(),
+      auditLog: oauthRuntime.loadAuditLog?.(),
+      ...readPortfolioHistoryFiltersFromUrl(url),
+      now
+    })
+  );
+}
+
+function handlePortfolioHistoryCompare(url, res, oauthRuntime, now) {
+  sendJson(
+    res,
+    200,
+    compareLatestPortfolioHistory({
+      portfolioHistoryStore: oauthRuntime.loadPortfolioHistoryStore(),
+      auditLog: oauthRuntime.loadAuditLog?.(),
+      goalId: url.searchParams.get("goal") || url.searchParams.get("goalId") || undefined,
       now
     })
   );
@@ -502,6 +583,24 @@ function readHistoryFiltersFromPayload(payload = {}) {
     providerId: payload.providerId,
     source: payload.source,
     type: payload.type,
+    since: payload.since,
+    until: payload.until,
+    limit: payload.limit
+  };
+}
+
+function readPortfolioHistoryFiltersFromUrl(url) {
+  return {
+    goalId: url.searchParams.get("goal") || url.searchParams.get("goalId") || undefined,
+    since: url.searchParams.get("since") || undefined,
+    until: url.searchParams.get("until") || undefined,
+    limit: url.searchParams.get("limit") || undefined
+  };
+}
+
+function readPortfolioHistoryFiltersFromPayload(payload = {}) {
+  return {
+    goalId: payload.goalId || payload.goal,
     since: payload.since,
     until: payload.until,
     limit: payload.limit

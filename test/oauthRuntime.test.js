@@ -11,10 +11,12 @@ import {
 test("server OAuth runtime loads client config and persists encrypted grants through file store", async () => {
   const tempDir = await mkdtemp(join(tmpdir(), "brain-hacking-runtime-"));
   const filePath = join(tempDir, "oauth-grants.json");
+  const portfolioHistoryPath = join(tempDir, "portfolio-history.json");
   const runtime = createServerOAuthRuntime({
     env: {
       BRAIN_HACKING_TOKEN_VAULT_KEY: Buffer.from(new Uint8Array(32).fill(6)).toString("base64url"),
       BRAIN_HACKING_TOKEN_GRANT_STORE: filePath,
+      BRAIN_HACKING_PORTFOLIO_HISTORY_STORE: portfolioHistoryPath,
       TWITTER_CLIENT_ID: "client-123"
     },
     now: () => Date.parse("2026-08-18T08:00:00.000Z"),
@@ -38,6 +40,26 @@ test("server OAuth runtime loads client config and persists encrypted grants thr
     const persisted = await readFile(filePath, "utf8");
     assert.equal(persisted.includes("server-side-access-token"), false);
     assert.equal(JSON.parse(persisted).grants.length, 1);
+
+    const portfolioHistoryStore = runtime.loadPortfolioHistoryStore();
+    const saved = portfolioHistoryStore.saveSnapshot({
+      activities: [
+        {
+          id: "twitter-1",
+          source: "twitter",
+          type: "like",
+          label: "Deep work systems",
+          weight: 1,
+          capturedAt: "2026-08-18T08:00:00.000Z",
+          permissionScope: "tweet.read"
+        }
+      ],
+      goalId: "discipline",
+      capturedAt: "2026-08-18T08:00:00.000Z"
+    });
+    const persistedPortfolioHistory = await readFile(portfolioHistoryPath, "utf8");
+    assert.equal(saved.status, "portfolio-snapshot-saved");
+    assert.equal(JSON.parse(persistedPortfolioHistory).snapshots.length, 1);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
@@ -48,6 +70,8 @@ test("server OAuth runtime reports missing backend configuration without collect
 
   assert.equal(summary.status, "requires-server-configuration");
   assert.ok(summary.requiredEnv.includes("BRAIN_HACKING_TOKEN_VAULT_KEY"));
+  assert.ok(summary.optionalEnv.includes("BRAIN_HACKING_PORTFOLIO_HISTORY_STORE"));
+  assert.equal(summary.portfolioHistoryStorePath, "/tmp/brain-hacking/.brain-hacking/portfolio-history.json");
   assert.ok(summary.guardrails.some((guardrail) => guardrail.includes("server environment")));
 
   const runtime = createServerOAuthRuntime({ env: {} });

@@ -15,7 +15,7 @@ Provider catalog
   -> Feed/personality analysis
 ```
 
-The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, a backend token exchange route, server-side runtime configuration, encrypted token vault primitives, file-backed encrypted grant persistence, sanitized OAuth audit logging, server-side grant list/export/disconnect controls, normalized manual activity ingestion, provider activity normalization, a file-backed normalized activity store primitive, server-side import history list/export/delete controls, a browser import history surface for filtered list/export/delete, an official read API client boundary, a disabled-by-default official import route with worker-to-store persistence, and an import adapter contract. The missing production backend pieces are scheduler policy, history UX hardening, and provider-specific production hardening.
+The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, a backend token exchange route, server-side runtime configuration, encrypted token vault primitives, file-backed encrypted grant persistence, sanitized OAuth audit logging, server-side grant list/export/disconnect controls, normalized manual activity ingestion, provider activity normalization, a file-backed normalized activity store primitive, server-side import history list/export/delete controls, a browser import history surface for filtered list/export/delete, server-side portfolio history list/export/delete/compare controls, an official read API client boundary, a disabled-by-default official import route with worker-to-store persistence, and an import adapter contract. The missing production backend pieces are scheduler policy, history UX hardening, and provider-specific production hardening.
 
 ## Adapter Contract
 
@@ -24,10 +24,10 @@ Provider imports enter the product through `src/integrations/adapters.js`.
 - Manual import is the only adapter that can import activities today. It accepts user-supplied text and emits normalized local activities.
 - OAuth providers expose read-only adapter readiness, required scopes, guardrails, and blockers, but their browser-facing import methods intentionally fail until retention UX hardening and provider review are complete.
 - Adapter guardrails explicitly prohibit password collection, browser token storage, and automated engagement.
-- The local server exposes `/api/oauth/authorization?provider=twitter` for backend-generated PKCE state, `/oauth/callback` for verified callback intake, `/api/oauth/token-exchange` for server-side authorization-code exchange, `/api/oauth/import` for disabled-by-default official read imports with normalized activity persistence, `/api/oauth/import-history` plus `/api/oauth/import-history/export` for normalized history controls, and `/api/oauth/runtime` for sanitized backend readiness. The browser history panel calls those history controls with explicit provider/type filters for deletion. The callback and import responses store no raw authorization code, raw provider payload, or token material.
+- The local server exposes `/api/oauth/authorization?provider=twitter` for backend-generated PKCE state, `/oauth/callback` for verified callback intake, `/api/oauth/token-exchange` for server-side authorization-code exchange, `/api/oauth/import` for disabled-by-default official read imports with normalized activity persistence, `/api/oauth/import-history` plus `/api/oauth/import-history/export` for normalized history controls, `/api/portfolio/history`, `/api/portfolio/history/export`, and `/api/portfolio/history/compare` for derived portfolio snapshot controls, and `/api/oauth/runtime` for sanitized backend readiness. The browser history panel calls import history controls with explicit provider/type filters for deletion. The callback and import responses store no raw authorization code, raw provider payload, or token material.
 - `src/integrations/tokenVault.js` provides the backend-only encrypted token envelope primitive for future OAuth token exchange wiring. It has no public endpoint, accepts only least-privilege catalog scopes, and keeps raw tokens out of grant summaries and browser code.
 - `src/integrations/tokenGrantStore.js` provides a file-backed persistence adapter for those encrypted envelopes. It stores only vault records, validates the store format on load, and updates the file through atomic replacement.
-- `src/integrations/oauthAuditLog.js` provides an append-only server-side audit event log for OAuth consent, callback, token exchange, grant export/disconnect/list, import history controls, and official read attempts. It rejects token-like fields before persistence.
+- `src/integrations/oauthAuditLog.js` provides an append-only server-side audit event log for OAuth consent, callback, token exchange, grant export/disconnect/list, import history controls, portfolio history controls, and official read attempts. It rejects token-like fields before persistence.
 - `src/integrations/oauthGrantControls.js` provides server-side grant controls for listing sanitized grants, exporting metadata-only grant summaries, and disconnecting accounts by deleting encrypted stored grants.
 - `src/integrations/oauthTokenExchange.js` defines the server-only authorization-code exchange boundary. It requires verified PKCE state, injected server-side client configuration, an encrypted token vault, and an injected `fetch`; it returns only a grant summary and never raw authorization codes, client secrets, or tokens.
 - `src/integrations/oauthRuntime.js` wires that boundary to server environment variables, a file-backed encrypted grant store, a normalized activity store, an explicit official-import feature flag, and no-secret readiness summaries.
@@ -97,6 +97,18 @@ The store is connected to the disabled-by-default backend import route for succe
 
 These controls advance retention/export/delete readiness without enabling live imports, collecting social credentials, or exposing raw provider payloads.
 
+## Portfolio History Controls
+
+`src/portfolioHistoryControls.js` defines the server-side user-control boundary over derived portfolio snapshots:
+
+- `GET /api/portfolio/history` returns bounded derived snapshots, optionally filtered by `goal`, `goalId`, `since`, and `until`.
+- `GET /api/portfolio/history/export` returns matching snapshots plus a retention note for user export flows.
+- `GET /api/portfolio/history/compare` compares the latest two snapshots for one goal without reading raw activities.
+- `DELETE /api/portfolio/history` removes snapshots only through an explicit goal or time boundary enforced by the portfolio history store.
+- Responses contain derived dimensions, clusters, and summaries only; OAuth grants, tokens, authorization codes, private messages, and raw provider payloads remain outside this boundary.
+
+These controls advance the personality/feed portfolio model while keeping official imports disabled by default and keeping sensitive inference history reviewable, exportable, and deletable.
+
 ## OAuth Token Exchange Boundary
 
 `src/integrations/oauthTokenExchange.js` is the first production-shaped seam between verified OAuth callbacks and encrypted token storage:
@@ -126,7 +138,7 @@ These controls close the first disconnect/delete/export gap without enabling use
 
 Current dimensions are aspiration alignment, attention focus, novelty, execution bias, and noise exposure. They are deterministic MVP heuristics intended to make scoring transparent while future OAuth adapters and local history storage mature.
 
-The same boundary now supports snapshot comparisons through `comparePortfolioMaps(beforeActivities, afterActivities, goalId)`. It reports dimension deltas, activity-count movement, emerging clusters, fading clusters, and a short headline without storing raw provider payloads. This is the foundation for weekly "what changed" summaries once local history and official read imports exist.
+The same boundary now supports snapshot comparisons through `comparePortfolioMaps(beforeActivities, afterActivities, goalId)`. It reports dimension deltas, activity-count movement, emerging clusters, fading clusters, and a short headline without storing raw provider payloads. A file-backed portfolio history store plus server-side controls can now list, export, delete, and compare derived snapshots. The remaining work is browser presentation and user-approved snapshot creation from saved import batches.
 
 ## Provider Readiness
 

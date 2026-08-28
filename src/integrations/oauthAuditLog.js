@@ -12,6 +12,10 @@ const allowedActions = new Set([
   "import-history-listed",
   "import-history-exported",
   "import-history-deleted",
+  "portfolio-history-listed",
+  "portfolio-history-exported",
+  "portfolio-history-deleted",
+  "portfolio-history-compared",
   "official-read-import-attempted"
 ]);
 const tokenLikeFields = [

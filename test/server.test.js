@@ -420,6 +420,123 @@ test("server exposes sanitized import history list, export, and delete controls"
   }
 });
 
+test("server exposes sanitized portfolio history list, export, compare, and delete controls", async () => {
+  const auditLog = createMemoryOAuthAuditLog({
+    now: () => Date.parse("2026-08-26T08:00:00.000Z")
+  });
+  const storedSnapshots = [
+    {
+      id: "discipline:20260820090000000",
+      capturedAt: "2026-08-20T09:00:00.000Z",
+      goal: { id: "discipline", label: "Discipline" },
+      note: "baseline",
+      activitySummary: { total: 1, bySource: { twitter: 1 }, byType: { like: 1 } },
+      dimensions: [
+        {
+          id: "aspiration_alignment",
+          label: "Aspiration alignment",
+          value: 20,
+          evidence: ["Deep work"],
+          explanation: "Share of weighted activity that overlaps the selected goal topics."
+        }
+      ],
+      clusters: [{ label: "deep", weight: 1, goalMatched: true }]
+    },
+    {
+      id: "discipline:20260821090000000",
+      capturedAt: "2026-08-21T09:00:00.000Z",
+      goal: { id: "discipline", label: "Discipline" },
+      note: "follow-up",
+      activitySummary: { total: 2, bySource: { twitter: 2 }, byType: { like: 1, follow: 1 } },
+      dimensions: [
+        {
+          id: "aspiration_alignment",
+          label: "Aspiration alignment",
+          value: 35,
+          evidence: ["Deep work"],
+          explanation: "Share of weighted activity that overlaps the selected goal topics."
+        }
+      ],
+      clusters: [{ label: "deep", weight: 2, goalMatched: true }]
+    }
+  ];
+  const portfolioHistoryStore = {
+    listSnapshots(filters = {}) {
+      return storedSnapshots.filter((snapshot) => !filters.goalId || snapshot.goal.id === filters.goalId);
+    },
+    compareLatest(goalId = "") {
+      const matching = storedSnapshots.filter((snapshot) => !goalId || snapshot.goal.id === goalId);
+      return {
+        status: "portfolio-history-compared",
+        beforeSnapshotId: matching[0].id,
+        afterSnapshotId: matching[1].id,
+        comparison: {
+          headline: "Aspiration alignment increased by 15 points.",
+          dimensions: []
+        }
+      };
+    },
+    deleteSnapshots(filters = {}) {
+      const matched = storedSnapshots.filter((snapshot) => !filters.goalId || snapshot.goal.id === filters.goalId);
+      return {
+        status: "portfolio-snapshots-deleted",
+        deleted: matched.length,
+        total: storedSnapshots.length - matched.length
+      };
+    }
+  };
+  const server = createServer(
+    createRequestHandler({
+      now: () => Date.parse("2026-08-26T08:00:00.000Z"),
+      oauthRuntime: {
+        loadPortfolioHistoryStore: () => portfolioHistoryStore,
+        loadAuditLog: () => auditLog
+      }
+    })
+  );
+  await listen(server);
+
+  try {
+    const baseUrl = `http://127.0.0.1:${server.address().port}`;
+    const listResponse = await fetch(`${baseUrl}/api/portfolio/history?goal=discipline`);
+    const listing = await listResponse.json();
+    const exportResponse = await fetch(`${baseUrl}/api/portfolio/history/export`);
+    const exported = await exportResponse.json();
+    const compareResponse = await fetch(`${baseUrl}/api/portfolio/history/compare?goalId=discipline`);
+    const compared = await compareResponse.json();
+    const deleteResponse = await fetch(`${baseUrl}/api/portfolio/history`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ goalId: "discipline" })
+    });
+    const deleted = await deleteResponse.json();
+
+    assert.equal(listResponse.status, 200);
+    assert.equal(listing.status, "portfolio-history-list-ready");
+    assert.equal(listing.snapshots.length, 2);
+    assert.equal(exportResponse.status, 200);
+    assert.equal(exported.status, "portfolio-history-export-ready");
+    assert.equal(JSON.stringify(exported).includes("server-side-access-token"), false);
+    assert.equal(compareResponse.status, 200);
+    assert.equal(compared.status, "portfolio-history-compared");
+    assert.match(compared.comparison.headline, /increased by 15/u);
+    assert.equal(deleteResponse.status, 200);
+    assert.equal(deleted.status, "portfolio-history-delete-complete");
+    assert.equal(deleted.deleted, 2);
+    assert.deepEqual(
+      auditLog.list().map((event) => event.action),
+      [
+        "portfolio-history-listed",
+        "portfolio-history-exported",
+        "portfolio-history-compared",
+        "portfolio-history-deleted"
+      ]
+    );
+  } finally {
+    await close(server);
+  }
+});
+
 test("server rejects OAuth callbacks that lack server-created state", async () => {
   const server = createServer(createRequestHandler({ stateStore: new Map() }));
   await listen(server);
