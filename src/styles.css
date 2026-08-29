@@ -233,6 +233,7 @@ label {
 
 select,
 input[type="number"],
+input[type="date"],
 input[type="text"],
 textarea {
   width: 100%;
@@ -437,6 +438,13 @@ input[type="range"] {
   margin-bottom: 12px;
 }
 
+.portfolio-history-controls {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) repeat(2, minmax(140px, 0.85fr)) 120px;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
 .history-actions {
   display: flex;
   flex-wrap: wrap;
@@ -492,7 +500,8 @@ meter {
   .adapter-card,
   .scope-grid,
   .portfolio-grid,
-  .history-controls {
+  .history-controls,
+  .portfolio-history-controls {
     grid-template-columns: 1fr;
   }
 

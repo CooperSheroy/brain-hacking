@@ -15,7 +15,7 @@ Provider catalog
   -> Feed/personality analysis
 ```
 
-The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, a backend token exchange route, server-side runtime configuration, encrypted token vault primitives, file-backed encrypted grant persistence, sanitized OAuth audit logging, server-side grant list/export/disconnect controls, normalized manual activity ingestion, provider activity normalization, a file-backed normalized activity store primitive, server-side import history list/export/delete controls, a browser import history surface for filtered list/export/delete, server-side portfolio history list/export/delete/compare controls, an official read API client boundary, a disabled-by-default official import route with worker-to-store persistence, and an import adapter contract. The missing production backend pieces are scheduler policy, history UX hardening, and provider-specific production hardening.
+The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, a backend token exchange route, server-side runtime configuration, encrypted token vault primitives, file-backed encrypted grant persistence, sanitized OAuth audit logging, server-side grant list/export/disconnect controls, normalized manual activity ingestion, provider activity normalization, a file-backed normalized activity store primitive, server-side import history list/export/delete controls, a browser import history surface for filtered list/export/delete, server-side portfolio history list/export/delete/compare controls, a browser portfolio history surface for filtered list/export/delete/compare, an official read API client boundary, a disabled-by-default official import route with worker-to-store persistence, and an import adapter contract. The missing production backend pieces are scheduler policy, history UX hardening, and provider-specific production hardening.
 
 ## Adapter Contract
 
@@ -106,8 +106,9 @@ These controls advance retention/export/delete readiness without enabling live i
 - `GET /api/portfolio/history/compare` compares the latest two snapshots for one goal without reading raw activities.
 - `DELETE /api/portfolio/history` removes snapshots only through an explicit goal or time boundary enforced by the portfolio history store.
 - Responses contain derived dimensions, clusters, and summaries only; OAuth grants, tokens, authorization codes, private messages, and raw provider payloads remain outside this boundary.
+- `src/portfolioHistoryUi.js` keeps browser-side route construction, bounded limits, compare summaries, and guarded delete payloads separate from rendering.
 
-These controls advance the personality/feed portfolio model while keeping official imports disabled by default and keeping sensitive inference history reviewable, exportable, and deletable.
+These controls advance the personality/feed portfolio model while keeping official imports disabled by default and keeping sensitive inference history reviewable, exportable, comparable, and deletable.
 
 ## OAuth Token Exchange Boundary
 
@@ -138,7 +139,7 @@ These controls close the first disconnect/delete/export gap without enabling use
 
 Current dimensions are aspiration alignment, attention focus, novelty, execution bias, and noise exposure. They are deterministic MVP heuristics intended to make scoring transparent while future OAuth adapters and local history storage mature.
 
-The same boundary now supports snapshot comparisons through `comparePortfolioMaps(beforeActivities, afterActivities, goalId)`. It reports dimension deltas, activity-count movement, emerging clusters, fading clusters, and a short headline without storing raw provider payloads. A file-backed portfolio history store plus server-side controls can now list, export, delete, and compare derived snapshots. The remaining work is browser presentation and user-approved snapshot creation from saved import batches.
+The same boundary now supports snapshot comparisons through `comparePortfolioMaps(beforeActivities, afterActivities, goalId)`. It reports dimension deltas, activity-count movement, emerging clusters, fading clusters, and a short headline without storing raw provider payloads. A file-backed portfolio history store plus server-side and browser controls can now list, export, delete, and compare derived snapshots. The remaining work is user-approved snapshot creation from saved import batches and retention policy hardening.
 
 ## Provider Readiness
 

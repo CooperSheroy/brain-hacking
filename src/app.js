@@ -12,6 +12,15 @@ import {
 import { normalizeManualSignals, summarizeActivities } from "./integrations/normalizedActivity.js";
 import { getProvider, providerCatalog } from "./integrations/providers.js";
 import { buildPortfolioMap } from "./portfolioModel.js";
+import {
+  createPortfolioGoalOptions,
+  createPortfolioHistoryDeleteBody,
+  createPortfolioHistoryFilters,
+  createPortfolioHistoryUrl,
+  isPortfolioHistoryDeleteEnabled,
+  summarizePortfolioComparison,
+  summarizePortfolioHistoryResponse
+} from "./portfolioHistoryUi.js";
 
 const state = {
   goalId: "discipline",
@@ -24,7 +33,14 @@ const state = {
   historyType: "",
   historyLimit: 25,
   historyStatus: "Not loaded",
-  historyActivities: []
+  historyActivities: [],
+  portfolioHistoryGoalId: "all",
+  portfolioHistorySince: "",
+  portfolioHistoryUntil: "",
+  portfolioHistoryLimit: 20,
+  portfolioHistoryStatus: "Not loaded",
+  portfolioSnapshots: [],
+  portfolioComparisonStatus: "No comparison loaded"
 };
 
 const goalSelect = document.querySelector("#goalSelect");
@@ -49,11 +65,25 @@ const historyExportButton = document.querySelector("#historyExportButton");
 const historyDeleteButton = document.querySelector("#historyDeleteButton");
 const historyStatus = document.querySelector("#historyStatus");
 const historyList = document.querySelector("#historyList");
+const portfolioHistoryGoalSelect = document.querySelector("#portfolioHistoryGoalSelect");
+const portfolioHistorySinceInput = document.querySelector("#portfolioHistorySinceInput");
+const portfolioHistoryUntilInput = document.querySelector("#portfolioHistoryUntilInput");
+const portfolioHistoryLimitInput = document.querySelector("#portfolioHistoryLimitInput");
+const portfolioHistoryRefreshButton = document.querySelector("#portfolioHistoryRefreshButton");
+const portfolioHistoryExportButton = document.querySelector("#portfolioHistoryExportButton");
+const portfolioHistoryCompareButton = document.querySelector("#portfolioHistoryCompareButton");
+const portfolioHistoryDeleteButton = document.querySelector("#portfolioHistoryDeleteButton");
+const portfolioHistoryStatus = document.querySelector("#portfolioHistoryStatus");
+const portfolioComparisonStatus = document.querySelector("#portfolioComparisonStatus");
+const portfolioHistoryList = document.querySelector("#portfolioHistoryList");
 
 function init() {
   goalSelect.innerHTML = goals.map((goal) => `<option value="${goal.id}">${goal.label}</option>`).join("");
   historyProviderSelect.innerHTML = createProviderOptions()
     .map((provider) => `<option value="${provider.value}">${provider.label}</option>`)
+    .join("");
+  portfolioHistoryGoalSelect.innerHTML = createPortfolioGoalOptions()
+    .map((goal) => `<option value="${goal.value}">${goal.label}</option>`)
     .join("");
   connectionList.innerHTML = providerCatalog
     .map(
@@ -100,6 +130,14 @@ function bindEvents() {
   historyRefreshButton.addEventListener("click", refreshImportHistory);
   historyExportButton.addEventListener("click", exportImportHistory);
   historyDeleteButton.addEventListener("click", deleteImportHistory);
+  document.querySelector("#portfolioHistoryControls").addEventListener("input", () => {
+    readPortfolioHistoryControls();
+    renderPortfolioHistory();
+  });
+  portfolioHistoryRefreshButton.addEventListener("click", refreshPortfolioHistory);
+  portfolioHistoryExportButton.addEventListener("click", exportPortfolioHistory);
+  portfolioHistoryCompareButton.addEventListener("click", comparePortfolioHistory);
+  portfolioHistoryDeleteButton.addEventListener("click", deletePortfolioHistory);
 
   connectionList.addEventListener("click", (event) => {
     const button = event.target.closest("[data-provider]");
@@ -126,6 +164,7 @@ function render() {
   renderSignals();
   renderIntegrationDetail();
   renderImportHistory();
+  renderPortfolioHistory();
 }
 
 function renderConnections() {
@@ -277,6 +316,32 @@ function renderImportHistory() {
     : `<p class="empty-state">${escapeHtml(state.historyStatus)}</p>`;
 }
 
+function renderPortfolioHistory() {
+  const filters = getPortfolioHistoryFilters();
+  portfolioHistoryGoalSelect.value = state.portfolioHistoryGoalId;
+  portfolioHistorySinceInput.value = state.portfolioHistorySince;
+  portfolioHistoryUntilInput.value = state.portfolioHistoryUntil;
+  portfolioHistoryLimitInput.value = state.portfolioHistoryLimit;
+  portfolioHistoryStatus.textContent = state.portfolioHistoryStatus;
+  portfolioComparisonStatus.textContent = state.portfolioComparisonStatus;
+  portfolioHistoryDeleteButton.disabled = !isPortfolioHistoryDeleteEnabled(filters);
+  portfolioHistoryList.innerHTML = state.portfolioSnapshots.length
+    ? state.portfolioSnapshots
+        .map(
+          (snapshot) => `
+            <article class="history-item">
+              <div>
+                <strong>${escapeHtml(snapshot.goal?.label || snapshot.goal?.id || "Portfolio snapshot")}</strong>
+                <span>${formatDate(snapshot.capturedAt)} &middot; ${snapshot.activitySummary?.total || 0} activities</span>
+              </div>
+              <span>${escapeHtml(formatTopSnapshotMetric(snapshot))}</span>
+            </article>
+          `
+        )
+        .join("")
+    : `<p class="empty-state">${escapeHtml(state.portfolioHistoryStatus)}</p>`;
+}
+
 async function refreshImportHistory() {
   readHistoryControls();
   state.historyStatus = "Loading history";
@@ -341,6 +406,86 @@ async function deleteImportHistory() {
   renderImportHistory();
 }
 
+async function refreshPortfolioHistory() {
+  readPortfolioHistoryControls();
+  state.portfolioHistoryStatus = "Loading snapshots";
+  renderPortfolioHistory();
+
+  try {
+    const response = await fetch(createPortfolioHistoryUrl("/api/portfolio/history", getPortfolioHistoryFilters()));
+    const payload = await response.json();
+    assertPortfolioHistoryResponse(response, payload);
+    state.portfolioSnapshots = payload.snapshots || [];
+    state.portfolioHistoryStatus = summarizePortfolioHistoryResponse(payload);
+  } catch (error) {
+    state.portfolioSnapshots = [];
+    state.portfolioHistoryStatus = error.message;
+  }
+
+  renderPortfolioHistory();
+}
+
+async function exportPortfolioHistory() {
+  readPortfolioHistoryControls();
+  try {
+    const response = await fetch(createPortfolioHistoryUrl("/api/portfolio/history/export", getPortfolioHistoryFilters()));
+    const payload = await response.json();
+    assertPortfolioHistoryResponse(response, payload);
+    downloadJson(payload, "brain-hacking-portfolio-history.json");
+    state.portfolioHistoryStatus = summarizePortfolioHistoryResponse(payload);
+  } catch (error) {
+    state.portfolioHistoryStatus = error.message;
+  }
+  renderPortfolioHistory();
+}
+
+async function comparePortfolioHistory() {
+  readPortfolioHistoryControls();
+  const filters = getPortfolioHistoryFilters();
+  const goal = filters.goal || state.goalId;
+
+  try {
+    const response = await fetch(createPortfolioHistoryUrl("/api/portfolio/history/compare", { goal }));
+    const payload = await response.json();
+    assertPortfolioHistoryResponse(response, payload);
+    state.portfolioComparisonStatus = summarizePortfolioComparison(payload);
+  } catch (error) {
+    state.portfolioComparisonStatus = error.message;
+  }
+  renderPortfolioHistory();
+}
+
+async function deletePortfolioHistory() {
+  readPortfolioHistoryControls();
+  const filters = getPortfolioHistoryFilters();
+  let body;
+  try {
+    body = createPortfolioHistoryDeleteBody(filters);
+  } catch (error) {
+    state.portfolioHistoryStatus = error.message;
+    renderPortfolioHistory();
+    return;
+  }
+  if (!confirm(`Delete portfolio snapshots for ${formatPortfolioDeleteBoundary(body)}?`)) {
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/portfolio/history", {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    const payload = await response.json();
+    assertPortfolioHistoryResponse(response, payload);
+    state.portfolioSnapshots = [];
+    state.portfolioHistoryStatus = `Deleted ${payload.deleted || 0} snapshots`;
+  } catch (error) {
+    state.portfolioHistoryStatus = error.message;
+  }
+  renderPortfolioHistory();
+}
+
 function exportPlan() {
   const plan = createPlan(state);
   const provider = getProvider(state.selectedProviderId);
@@ -369,6 +514,13 @@ function readHistoryControls() {
   state.historyLimit = Number(historyLimitInput.value);
 }
 
+function readPortfolioHistoryControls() {
+  state.portfolioHistoryGoalId = portfolioHistoryGoalSelect.value;
+  state.portfolioHistorySince = portfolioHistorySinceInput.value;
+  state.portfolioHistoryUntil = portfolioHistoryUntilInput.value;
+  state.portfolioHistoryLimit = Number(portfolioHistoryLimitInput.value);
+}
+
 function getHistoryFilters() {
   return createImportHistoryFilters({
     providerId: state.historyProviderId,
@@ -377,9 +529,24 @@ function getHistoryFilters() {
   });
 }
 
+function getPortfolioHistoryFilters() {
+  return createPortfolioHistoryFilters({
+    goalId: state.portfolioHistoryGoalId,
+    since: state.portfolioHistorySince,
+    until: state.portfolioHistoryUntil,
+    limit: state.portfolioHistoryLimit
+  });
+}
+
 function assertHistoryResponse(response, payload) {
   if (!response.ok || payload?.ok === false) {
     throw new Error(payload?.error || "Import history request failed.");
+  }
+}
+
+function assertPortfolioHistoryResponse(response, payload) {
+  if (!response.ok || payload?.ok === false) {
+    throw new Error(payload?.error || "Portfolio history request failed.");
   }
 }
 
@@ -419,6 +586,15 @@ function formatDate(value) {
 
 function formatDeleteBoundary(body) {
   return [body.source, body.type].filter(Boolean).join(" / ");
+}
+
+function formatPortfolioDeleteBoundary(body) {
+  return [body.goalId, body.since, body.until].filter(Boolean).join(" / ");
+}
+
+function formatTopSnapshotMetric(snapshot) {
+  const topDimension = [...(snapshot.dimensions || [])].sort((a, b) => b.value - a.value)[0];
+  return topDimension ? `${topDimension.label}: ${topDimension.value}%` : "derived snapshot";
 }
 
 init();

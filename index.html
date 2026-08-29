@@ -132,6 +132,38 @@
             <p>Early read from goals and feed signals. This becomes richer once official integrations exist.</p>
           </div>
           <div id="portfolioGrid" class="portfolio-grid"></div>
+          <section class="history-panel" aria-label="Portfolio history">
+            <div class="panel-heading">
+              <h3>Portfolio History</h3>
+              <span id="portfolioHistoryStatus" class="badge">Not loaded</span>
+            </div>
+            <form id="portfolioHistoryControls" class="portfolio-history-controls">
+              <label>
+                Goal
+                <select id="portfolioHistoryGoalSelect" name="goal"></select>
+              </label>
+              <label>
+                Since
+                <input id="portfolioHistorySinceInput" name="since" type="date" />
+              </label>
+              <label>
+                Until
+                <input id="portfolioHistoryUntilInput" name="until" type="date" />
+              </label>
+              <label>
+                Limit
+                <input id="portfolioHistoryLimitInput" name="limit" type="number" min="1" max="100" value="20" />
+              </label>
+            </form>
+            <div class="history-actions">
+              <button id="portfolioHistoryRefreshButton" type="button">Refresh</button>
+              <button id="portfolioHistoryExportButton" type="button">Export</button>
+              <button id="portfolioHistoryCompareButton" type="button">Compare Latest</button>
+              <button id="portfolioHistoryDeleteButton" type="button" disabled>Delete Filtered</button>
+            </div>
+            <p id="portfolioComparisonStatus" class="empty-state">No comparison loaded</p>
+            <div id="portfolioHistoryList" class="history-list"></div>
+          </section>
         </section>
       </section>
     </main>
