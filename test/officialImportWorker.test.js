@@ -90,6 +90,58 @@ test("official import worker imports consented endpoints through the read client
   );
 });
 
+test("official import worker passes endpoint cursors and returns next cursors", async () => {
+  const requestedUrls = [];
+  const worker = createOfficialImportWorker({
+    enabled: true,
+    tokenVault: createVault(["tweet.read"]),
+    now,
+    fetchImpl: async (url) => {
+      requestedUrls.push(url);
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            data: [{ id: "tweet-2", text: "Reading queue cleanup" }],
+            meta: { next_token: "next_page_2" }
+          };
+        }
+      };
+    }
+  });
+
+  const result = await worker.runImport({
+    providerId: "twitter",
+    accountId: "user-123",
+    endpointIds: ["liked-posts"],
+    cursors: { "liked-posts": "page_1" }
+  });
+
+  assert.equal(result.status, "official-import-succeeded");
+  assert.deepEqual(requestedUrls, [
+    "https://api.twitter.com/2/users/user-123/liked_tweets?pagination_token=page_1"
+  ]);
+  assert.deepEqual(result.nextCursors, { "liked-posts": "next_page_2" });
+  assert.equal(JSON.stringify(result).includes("server-side-access-token"), false);
+});
+
+test("official import worker rejects unknown cursor endpoint ids", async () => {
+  const worker = createOfficialImportWorker({
+    enabled: true,
+    tokenVault: createVault(),
+    now,
+    fetchImpl: async () => {
+      throw new Error("fetch should not run for unknown cursor endpoints");
+    }
+  });
+
+  await assert.rejects(
+    () => worker.runImport({ providerId: "twitter", accountId: "user-123", cursors: { unknown: "page_1" } }),
+    /Unknown official import cursor endpoint id: unknown/u
+  );
+});
+
 test("official import worker skips endpoints outside the consented scopes", async () => {
   const requestedUrls = [];
   const worker = createOfficialImportWorker({

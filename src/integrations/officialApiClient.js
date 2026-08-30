@@ -8,6 +8,7 @@ const readEndpointCatalog = {
       label: "Liked posts",
       scope: "tweet.read",
       signalType: "likes",
+      cursorParam: "pagination_token",
       urlTemplate: "https://api.twitter.com/2/users/{accountId}/liked_tweets"
     },
     {
@@ -15,6 +16,7 @@ const readEndpointCatalog = {
       label: "Following",
       scope: "users.read",
       signalType: "follows",
+      cursorParam: "pagination_token",
       urlTemplate: "https://api.twitter.com/2/users/{accountId}/following"
     }
   ],
@@ -24,6 +26,7 @@ const readEndpointCatalog = {
       label: "Owned media",
       scope: "user_media",
       signalType: "media",
+      cursorParam: "after",
       urlTemplate: "https://graph.instagram.com/me/media"
     },
     {
@@ -47,9 +50,10 @@ const readEndpointCatalog = {
 
 export function listOfficialReadEndpoints(providerId) {
   const provider = assertOAuthProvider(providerId);
-  return getEndpointCatalog(provider.id).map(({ urlTemplate, ...endpoint }) => ({
+  return getEndpointCatalog(provider.id).map(({ urlTemplate, cursorParam, ...endpoint }) => ({
     ...endpoint,
-    method: "GET"
+    method: "GET",
+    supportsCursor: Boolean(cursorParam)
   }));
 }
 
@@ -122,6 +126,7 @@ export function createOfficialReadClient({
         permissionScope: record.permissionScope || endpoint.scope
       }));
       const activities = normalizeProviderActivities(provider.id, records);
+      const nextCursor = extractNextCursor(payload);
       appendAuditEvent(auditLog, {
         action: "official-read-import-attempted",
         providerId: provider.id,
@@ -130,7 +135,8 @@ export function createOfficialReadClient({
         metadata: {
           endpointId: endpoint.id,
           activityCount: activities.length,
-          requiredScope: endpoint.scope
+          requiredScope: endpoint.scope,
+          hasNextCursor: Boolean(nextCursor)
         }
       });
 
@@ -142,6 +148,7 @@ export function createOfficialReadClient({
         requiredScope: endpoint.scope,
         signalType: endpoint.signalType,
         importedAt: new Date(now()).toISOString(),
+        nextCursor,
         activities,
         summary: summarizeActivities(activities)
       };
@@ -197,6 +204,10 @@ function buildEndpointUrl(endpoint, accountId, options) {
   if (Number.isInteger(limit) && limit > 0) {
     url.searchParams.set("limit", String(Math.min(limit, 100)));
   }
+  const cursor = normalizeCursor(options.cursor);
+  if (cursor && endpoint.cursorParam) {
+    url.searchParams.set(endpoint.cursorParam, cursor);
+  }
   return url.toString();
 }
 
@@ -245,6 +256,10 @@ function extractRecords(payload) {
   throw new Error("Provider API payload did not include importable data records.");
 }
 
+function extractNextCursor(payload) {
+  return normalizeCursor(payload?.meta?.next_token || payload?.paging?.cursors?.after || "");
+}
+
 function normalizeAccountId(accountId) {
   const normalized = String(accountId || "").trim();
   if (!/^[a-zA-Z0-9:._@-]{1,120}$/u.test(normalized)) {
@@ -258,6 +273,17 @@ function cleanErrorDetail(value) {
     .replace(/\s+/gu, " ")
     .trim()
     .slice(0, 160);
+}
+
+function normalizeCursor(value) {
+  const cursor = cleanErrorDetail(value);
+  if (!cursor) {
+    return "";
+  }
+  if (!/^[a-zA-Z0-9._~:@-]{1,256}$/u.test(cursor)) {
+    throw new Error("Official API pagination cursor must be a stable non-secret token.");
+  }
+  return cursor;
 }
 
 function parseRetryAfterSeconds(value, now) {

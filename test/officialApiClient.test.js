@@ -37,6 +37,7 @@ test("listOfficialReadEndpoints exposes least-privilege read endpoints without U
       ["following", "users.read", "GET"]
     ]
   );
+  assert.equal(endpoints[0].supportsCursor, true);
   assert.equal("urlTemplate" in endpoints[0], false);
   assert.throws(() => listOfficialReadEndpoints("manual"), /does not support official OAuth API reads/u);
 });
@@ -103,6 +104,64 @@ test("official read client imports provider data through vault-backed read reque
     }
   ]);
   assert.equal(JSON.stringify(result).includes("server-side-access-token"), false);
+});
+
+test("official read client sends and returns sanitized pagination cursors", async () => {
+  let capturedUrl;
+  const auditLog = createMemoryOAuthAuditLog({ now });
+  const client = createOfficialReadClient({
+    providerId: "twitter",
+    accountId: "user-123",
+    tokenVault: createVault(),
+    auditLog,
+    now,
+    fetchImpl: async (url) => {
+      capturedUrl = url;
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            data: [{ id: "tweet-2", text: "Focused practice notes" }],
+            meta: { next_token: "cursor_456" }
+          };
+        }
+      };
+    }
+  });
+
+  const result = await client.importActivities("liked-posts", {
+    limit: 20,
+    cursor: "cursor_123"
+  });
+
+  assert.equal(
+    capturedUrl,
+    "https://api.twitter.com/2/users/user-123/liked_tweets?limit=20&pagination_token=cursor_123"
+  );
+  assert.equal(result.nextCursor, "cursor_456");
+  assert.equal(JSON.stringify(result).includes("server-side-access-token"), false);
+  assert.deepEqual(
+    auditLog.list().map((event) => event.metadata.hasNextCursor),
+    [undefined, true]
+  );
+});
+
+test("official read client rejects unsafe pagination cursors before fetch", async () => {
+  const client = createOfficialReadClient({
+    providerId: "twitter",
+    accountId: "user-123",
+    tokenVault: createVault(),
+    now,
+    fetchImpl: async () => {
+      throw new Error("fetch should not run for unsafe cursors");
+    }
+  });
+
+  await assert.rejects(
+    () => client.importActivities("liked-posts", { cursor: "Bearer token value" }),
+    /pagination cursor must be a stable non-secret token/u
+  );
 });
 
 test("official read client blocks missing scopes and expired grants before fetch", async () => {

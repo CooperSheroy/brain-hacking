@@ -282,14 +282,17 @@ test("server official OAuth import route persists normalized activities when ena
       oauthRuntime: {
         officialImportsEnabled: true,
         fetchImpl: async (url, init) => {
-          assert.equal(url, "https://api.twitter.com/2/users/user-123/liked_tweets?limit=1");
+          assert.equal(url, "https://api.twitter.com/2/users/user-123/liked_tweets?limit=1&pagination_token=page_1");
           assert.equal(init.method, "GET");
           assert.equal(init.headers.authorization, "Bearer server-side-access-token");
           return {
             ok: true,
             status: 200,
             async json() {
-              return { data: [{ id: "tweet-1", text: "Deep work systems" }] };
+              return {
+                data: [{ id: "tweet-1", text: "Deep work systems" }],
+                meta: { next_token: "page_2" }
+              };
             }
           };
         },
@@ -309,7 +312,8 @@ test("server official OAuth import route persists normalized activities when ena
         providerId: "twitter",
         accountId: "user-123",
         endpointIds: ["liked-posts"],
-        limit: 1
+        limit: 1,
+        cursors: { "liked-posts": "page_1" }
       })
     });
     const payload = await response.json();
@@ -318,6 +322,7 @@ test("server official OAuth import route persists normalized activities when ena
     assert.equal(payload.status, "official-import-succeeded");
     assert.equal(payload.importedActivityCount, 1);
     assert.equal(payload.importSummary.bySource.twitter, 1);
+    assert.deepEqual(payload.nextCursors, { "liked-posts": "page_2" });
     assert.equal(payload.persistence.status, "normalized-activities-persisted");
     assert.equal(persistedActivities[0].id, "twitter-tweet-1");
     assert.equal(JSON.stringify(payload).includes("server-side-access-token"), false);

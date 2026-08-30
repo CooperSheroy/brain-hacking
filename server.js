@@ -323,7 +323,8 @@ async function handleOfficialOAuthImport(req, res, oauthRuntime, now) {
     providerId,
     accountId,
     endpointIds: payload.endpointIds,
-    limit: payload.limit
+    limit: payload.limit,
+    cursors: payload.cursors
   });
   const persistence = persistOfficialImportActivities(result, oauthRuntime);
 
@@ -520,6 +521,7 @@ function sanitizeOfficialImportResult(result) {
     importedAt,
     importedEndpoints,
     skippedEndpoints,
+    nextCursors,
     failedEndpointId,
     retryAfterSeconds
   } = result;
@@ -532,6 +534,7 @@ function sanitizeOfficialImportResult(result) {
     importedAt,
     importedEndpoints,
     skippedEndpoints,
+    nextCursors,
     failedEndpointId,
     retryAfterSeconds,
     importedActivityCount: activities.length,

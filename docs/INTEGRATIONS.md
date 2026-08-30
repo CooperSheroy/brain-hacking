@@ -15,7 +15,7 @@ Provider catalog
   -> Feed/personality analysis
 ```
 
-The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, a backend token exchange route, server-side runtime configuration, encrypted token vault primitives, file-backed encrypted grant persistence, sanitized OAuth audit logging, server-side grant list/export/disconnect controls, normalized manual activity ingestion, provider activity normalization, a file-backed normalized activity store primitive, server-side import history list/export/delete controls, a browser import history surface for filtered list/export/delete, server-side portfolio history list/export/delete/compare controls, a browser portfolio history surface for filtered list/export/delete/compare, an official read API client boundary, a disabled-by-default official import route with worker-to-store persistence, and an import adapter contract. The missing production backend pieces are scheduler policy, history UX hardening, and provider-specific production hardening.
+The current repository includes the provider catalog, consent summaries, OAuth PKCE request construction, server-side callback intake, a backend token exchange route, server-side runtime configuration, encrypted token vault primitives, file-backed encrypted grant persistence, sanitized OAuth audit logging, server-side grant list/export/disconnect controls, normalized manual activity ingestion, provider activity normalization, a file-backed normalized activity store primitive, server-side import history list/export/delete controls, a browser import history surface for filtered list/export/delete, server-side portfolio history list/export/delete/compare controls, a browser portfolio history surface for filtered list/export/delete/compare, an official read API client boundary with sanitized pagination cursor support, a disabled-by-default official import route with worker-to-store persistence, and an import adapter contract. The missing production backend pieces are scheduler policy, history UX hardening, and provider-specific production hardening.
 
 ## Adapter Contract
 
@@ -57,6 +57,7 @@ This keeps future OAuth adapters focused on least-privilege read imports and mak
 - It refuses to fetch when the encrypted grant is expired or missing the endpoint's least-privilege scope.
 - It sends only `GET` requests, maps successful provider records through `normalizeProviderActivities`, and returns no token material.
 - It returns adapter-ready import metadata, required-scope provenance, normalized activity summaries, and activities in the same shape that portfolio snapshots consume.
+- It accepts provider continuation cursors only as validated endpoint options, adds them through endpoint-specific query parameters, and returns sanitized `nextCursor` values without exposing raw provider payloads.
 - It surfaces provider rate limits and errors as import failures instead of retrying or working around platform controls.
 
 This advances the OAuth/API roadmap while keeping real credential collection, scraping, and engagement automation out of scope.
@@ -69,6 +70,7 @@ This advances the OAuth/API roadmap while keeping real credential collection, sc
 - It reads grant summaries from the server-side vault to select only endpoints covered by consented scopes.
 - It delegates provider requests to the official read client, so access tokens stay inside backend-only code.
 - It imports endpoints sequentially and stops on `429` responses, returning `retryAfterSeconds` when the provider supplies a `Retry-After` header.
+- It passes per-endpoint pagination cursors through the read client and returns only endpoint-keyed `nextCursors` for explicit follow-up imports.
 - It returns normalized activities plus source/type summaries that the portfolio map can consume.
 
 This is still not a user-facing live import feature. The next step is provider production review, scheduler policy, and history retention UX hardening.

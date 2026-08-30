@@ -27,9 +27,11 @@ export function createOfficialImportWorker({
     enabled: Boolean(enabled),
     guardrails: [...guardrails],
 
-    async runImport({ providerId, accountId, endpointIds, limit } = {}) {
+    async runImport({ providerId, accountId, endpointIds, limit, cursors } = {}) {
       const provider = assertOAuthProvider(providerId);
       const normalizedAccountId = normalizeAccountId(accountId);
+      const endpointCursors = normalizeEndpointCursors(cursors);
+      assertKnownCursorEndpoints(provider.id, endpointCursors);
       if (!enabled) {
         return emptyResult({
           status: "official-import-disabled",
@@ -62,12 +64,19 @@ export function createOfficialImportWorker({
       });
       const activities = [];
       const importedEndpoints = [];
+      const nextCursors = {};
 
       for (const endpoint of endpoints) {
         try {
-          const result = await client.importActivities(endpoint.id, { limit });
+          const result = await client.importActivities(endpoint.id, {
+            limit,
+            cursor: endpointCursors[endpoint.id]
+          });
           activities.push(...result.activities);
           importedEndpoints.push(endpoint.id);
+          if (result.nextCursor) {
+            nextCursors[endpoint.id] = result.nextCursor;
+          }
         } catch (error) {
           if (error.providerStatus === 429) {
             return {
@@ -79,6 +88,7 @@ export function createOfficialImportWorker({
               importedEndpoints,
               failedEndpointId: endpoint.id,
               retryAfterSeconds: error.retryAfterSeconds || null,
+              nextCursors,
               activities,
               summary: summarizeActivities(activities),
               guardrails: [...guardrails]
@@ -96,6 +106,7 @@ export function createOfficialImportWorker({
         importedAt: new Date(now()).toISOString(),
         importedEndpoints,
         skippedEndpoints: skippedEndpoints(provider.id, grant.scopes, endpointIds),
+        nextCursors,
         activities,
         summary: summarizeActivities(activities),
         guardrails: [...guardrails]
@@ -176,6 +187,41 @@ function normalizeEndpointIds(endpointIds, catalog) {
   return [...new Set(normalized)];
 }
 
+function normalizeEndpointCursors(cursors) {
+  if (cursors === undefined || cursors === null) {
+    return {};
+  }
+  if (!cursors || typeof cursors !== "object" || Array.isArray(cursors)) {
+    throw new TypeError("Official import cursors must be an object keyed by endpoint id.");
+  }
+  return Object.fromEntries(
+    Object.entries(cursors)
+      .map(([endpointId, cursor]) => [String(endpointId || "").trim(), normalizeCursor(cursor)])
+      .filter(([endpointId, cursor]) => endpointId && cursor)
+  );
+}
+
+function assertKnownCursorEndpoints(providerId, cursors) {
+  const knownEndpointIds = new Set(listOfficialReadEndpoints(providerId).map((endpoint) => endpoint.id));
+  const unknownEndpointId = Object.keys(cursors).find((endpointId) => !knownEndpointIds.has(endpointId));
+  if (unknownEndpointId) {
+    throw new Error(`Unknown official import cursor endpoint id: ${unknownEndpointId}`);
+  }
+}
+
+function normalizeCursor(value) {
+  const cursor = String(value || "")
+    .replace(/\s+/gu, " ")
+    .trim();
+  if (!cursor) {
+    return "";
+  }
+  if (!/^[a-zA-Z0-9._~:@-]{1,256}$/u.test(cursor)) {
+    throw new Error("Official import cursor must be a stable non-secret token.");
+  }
+  return cursor;
+}
+
 function normalizeAccountId(accountId) {
   const normalized = String(accountId || "").trim();
   if (!/^[a-zA-Z0-9:._@-]{1,120}$/u.test(normalized)) {
@@ -193,6 +239,7 @@ function emptyResult({ status, providerId, accountId, importedAt, skippedEndpoin
     importedAt: new Date(importedAt()).toISOString(),
     importedEndpoints: [],
     skippedEndpoints,
+    nextCursors: {},
     activities: [],
     summary: summarizeActivities([]),
     guardrails: [...guardrails]
