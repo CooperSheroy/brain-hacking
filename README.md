@@ -12,7 +12,7 @@ The long-term direction is a consent-based personality and feed portfolio: a map
 - Personality portfolio estimate from the selected goal and user-provided feed signals.
 - Exportable local plan JSON.
 - Static browser app with a tiny Node server.
-- Provider integration foundation with OAuth/PKCE request construction, server-side callback intake, backend token exchange route, encrypted token vault primitives, file-backed encrypted grant storage, server-side grant list/export/disconnect controls, server-side and browser import history list/export/delete controls, server-side portfolio history list/export/delete/compare controls, consent summaries, normalized activity boundaries, and a disabled-by-default official import worker.
+- Provider integration foundation with OAuth/PKCE request construction, server-side callback intake, backend token exchange route, encrypted token vault primitives, file-backed encrypted grant storage, server-side grant list/export/disconnect controls, server-side and browser import history list/export/delete controls, server-side portfolio snapshot creation/list/export/delete/compare controls, consent summaries, normalized activity boundaries, and a disabled-by-default official import worker.
 
 ## Run
 
@@ -56,7 +56,7 @@ Real social media account connections are not live yet. The repository now conta
 - server-side grant controls for listing/exporting sanitized metadata and disconnecting stored grants without exposing token material;
 - disabled-by-default official import worker that reads only consented endpoints, stops on rate limits, and returns normalized activity summaries without token material;
 - server-side and browser import history controls for listing, exporting, and deleting sanitized normalized activities without touching OAuth grants;
-- server-side portfolio history controls for listing, exporting, deleting, and comparing derived portfolio snapshots without exposing raw activity payloads or token material;
+- server-side portfolio history controls for creating, listing, exporting, deleting, and comparing derived portfolio snapshots from sanitized import history without exposing raw activity payloads or token material;
 - per-scope consent and risk summaries;
 - normalized activity boundaries for imported or manually supplied signals.
 

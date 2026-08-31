@@ -12,6 +12,7 @@ const allowedActions = new Set([
   "import-history-listed",
   "import-history-exported",
   "import-history-deleted",
+  "portfolio-history-snapshot-created",
   "portfolio-history-listed",
   "portfolio-history-exported",
   "portfolio-history-deleted",

@@ -465,7 +465,30 @@ test("server exposes sanitized portfolio history list, export, compare, and dele
       clusters: [{ label: "deep", weight: 2, goalMatched: true }]
     }
   ];
+  const storedActivities = [
+    {
+      id: "twitter-liked-123",
+      source: "twitter",
+      type: "like",
+      label: "Deep work systems",
+      weight: 1,
+      capturedAt: "2026-08-20T09:00:00.000Z",
+      permissionScope: "tweet.read"
+    }
+  ];
+  let savedSnapshotRequest;
+  let requestedActivityFilters;
   const portfolioHistoryStore = {
+    saveSnapshot(request) {
+      savedSnapshotRequest = request;
+      return {
+        status: "portfolio-snapshot-saved",
+        inserted: 1,
+        updated: 0,
+        total: storedSnapshots.length + 1,
+        snapshot: storedSnapshots[1]
+      };
+    },
     listSnapshots(filters = {}) {
       return storedSnapshots.filter((snapshot) => !filters.goalId || snapshot.goal.id === filters.goalId);
     },
@@ -494,6 +517,12 @@ test("server exposes sanitized portfolio history list, export, compare, and dele
     createRequestHandler({
       now: () => Date.parse("2026-08-26T08:00:00.000Z"),
       oauthRuntime: {
+        loadActivityStore: () => ({
+          listActivities(filters = {}) {
+            requestedActivityFilters = filters;
+            return storedActivities.filter((activity) => !filters.source || activity.source === filters.source);
+          }
+        }),
         loadPortfolioHistoryStore: () => portfolioHistoryStore,
         loadAuditLog: () => auditLog
       }
@@ -503,6 +532,17 @@ test("server exposes sanitized portfolio history list, export, compare, and dele
 
   try {
     const baseUrl = `http://127.0.0.1:${server.address().port}`;
+    const createResponse = await fetch(`${baseUrl}/api/portfolio/history?provider=twitter`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        goalId: "discipline",
+        since: "2026-08-20",
+        limit: 10,
+        note: "weekly import"
+      })
+    });
+    const created = await createResponse.json();
     const listResponse = await fetch(`${baseUrl}/api/portfolio/history?goal=discipline`);
     const listing = await listResponse.json();
     const exportResponse = await fetch(`${baseUrl}/api/portfolio/history/export`);
@@ -516,6 +556,19 @@ test("server exposes sanitized portfolio history list, export, compare, and dele
     });
     const deleted = await deleteResponse.json();
 
+    assert.equal(createResponse.status, 200);
+    assert.equal(created.status, "portfolio-history-snapshot-created");
+    assert.equal(created.snapshot.id, "discipline:20260821090000000");
+    assert.equal("activities" in created, false);
+    assert.equal(JSON.stringify(created).includes("server-side-access-token"), false);
+    assert.deepEqual(requestedActivityFilters, {
+      source: "twitter",
+      since: "2026-08-20T00:00:00.000Z",
+      limit: 10
+    });
+    assert.equal(savedSnapshotRequest.activities.length, 1);
+    assert.equal(savedSnapshotRequest.goalId, "discipline");
+    assert.equal(savedSnapshotRequest.note, "weekly import");
     assert.equal(listResponse.status, 200);
     assert.equal(listing.status, "portfolio-history-list-ready");
     assert.equal(listing.snapshots.length, 2);
@@ -531,6 +584,7 @@ test("server exposes sanitized portfolio history list, export, compare, and dele
     assert.deepEqual(
       auditLog.list().map((event) => event.action),
       [
+        "portfolio-history-snapshot-created",
         "portfolio-history-listed",
         "portfolio-history-exported",
         "portfolio-history-compared",

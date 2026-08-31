@@ -20,6 +20,7 @@ import {
 } from "./src/integrations/oauthGrantControls.js";
 import {
   compareLatestPortfolioHistory,
+  createPortfolioSnapshotFromHistory,
   deletePortfolioHistory,
   exportPortfolioHistory,
   listPortfolioHistory
@@ -189,6 +190,26 @@ function handleOAuthImportHistoryExport(url, res, oauthRuntime, now) {
 }
 
 async function handlePortfolioHistory(req, url, res, oauthRuntime, now) {
+  if (req.method === "POST") {
+    const payload = await readJsonBody(req);
+    sendJson(
+      res,
+      200,
+      createPortfolioSnapshotFromHistory({
+        activityStore: oauthRuntime.loadActivityStore(),
+        portfolioHistoryStore: oauthRuntime.loadPortfolioHistoryStore(),
+        auditLog: oauthRuntime.loadAuditLog?.(),
+        ...readHistoryFiltersFromUrl(url),
+        ...definedValues(readHistoryFiltersFromPayload(payload)),
+        goalId: payload.goalId || payload.goal || url.searchParams.get("goal") || url.searchParams.get("goalId"),
+        note: payload.note,
+        capturedAt: payload.capturedAt,
+        now
+      })
+    );
+    return;
+  }
+
   if (req.method === "GET") {
     sendJson(
       res,
@@ -219,7 +240,7 @@ async function handlePortfolioHistory(req, url, res, oauthRuntime, now) {
     return;
   }
 
-  throw new Error("Portfolio history route requires GET or DELETE.");
+  throw new Error("Portfolio history route requires GET, POST, or DELETE.");
 }
 
 function handlePortfolioHistoryExport(url, res, oauthRuntime, now) {
@@ -608,6 +629,10 @@ function readPortfolioHistoryFiltersFromPayload(payload = {}) {
     until: payload.until,
     limit: payload.limit
   };
+}
+
+function definedValues(values) {
+  return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined));
 }
 
 function appendOAuthAudit(oauthRuntime, event) {

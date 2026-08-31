@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   compareLatestPortfolioHistory,
+  createPortfolioSnapshotFromHistory,
   deletePortfolioHistory,
   exportPortfolioHistory,
   listPortfolioHistory,
@@ -37,6 +38,100 @@ const snapshots = [
     clusters: [{ label: "startup", weight: 1, goalMatched: true }]
   }
 ];
+
+test("portfolio history controls create derived snapshots from sanitized import history", () => {
+  const auditLog = createMemoryOAuthAuditLog({
+    now: () => Date.parse("2026-08-26T06:50:00.000Z")
+  });
+  const activityStore = {
+    listActivities(filters) {
+      assert.deepEqual(filters, {
+        source: "twitter",
+        since: "2026-08-20T00:00:00.000Z",
+        limit: 5
+      });
+      return [
+        {
+          id: "twitter-liked-123",
+          source: "twitter",
+          type: "like",
+          label: "Deep work systems",
+          weight: 1,
+          capturedAt: "2026-08-20T09:00:00.000Z",
+          permissionScope: "tweet.read"
+        }
+      ];
+    }
+  };
+  const portfolioHistoryStore = {
+    saveSnapshot({ activities, goalId, capturedAt, note }) {
+      assert.equal(activities.length, 1);
+      assert.equal(goalId, "discipline");
+      assert.equal(capturedAt, "2026-08-26T06:45:00.000Z");
+      assert.equal(note, "weekly import");
+      return {
+        status: "portfolio-snapshot-saved",
+        inserted: 1,
+        updated: 0,
+        total: 1,
+        snapshot: snapshots[0]
+      };
+    }
+  };
+
+  const result = createPortfolioSnapshotFromHistory({
+    activityStore,
+    portfolioHistoryStore,
+    auditLog,
+    goalId: "discipline",
+    providerId: "twitter",
+    since: "2026-08-20",
+    limit: 5,
+    note: "weekly import",
+    capturedAt: "2026-08-26T06:45:00.000Z",
+    now: () => Date.parse("2026-08-26T06:50:00.000Z")
+  });
+
+  assert.equal(result.status, "portfolio-history-snapshot-created");
+  assert.equal(result.snapshot.id, "discipline:20260821090000000");
+  assert.equal(result.persistence.inserted, 1);
+  assert.equal(result.sourceActivitySummary.total, 2);
+  assert.equal("activities" in result, false);
+  assert.equal(JSON.stringify(result).includes("server-side-access-token"), false);
+  assert.deepEqual(
+    auditLog.list().map((event) => [event.action, event.status]),
+    [["portfolio-history-snapshot-created", "portfolio-history-snapshot-created"]]
+  );
+});
+
+test("portfolio history controls do not save empty source history snapshots", () => {
+  const auditLog = createMemoryOAuthAuditLog({
+    now: () => Date.parse("2026-08-26T06:55:00.000Z")
+  });
+  const result = createPortfolioSnapshotFromHistory({
+    activityStore: {
+      listActivities() {
+        return [];
+      }
+    },
+    portfolioHistoryStore: {
+      saveSnapshot() {
+        throw new Error("empty source history should not save a snapshot");
+      }
+    },
+    auditLog,
+    goalId: "discipline",
+    now: () => Date.parse("2026-08-26T06:55:00.000Z")
+  });
+
+  assert.equal(result.status, "portfolio-history-snapshot-empty");
+  assert.equal(result.sourceActivitySummary.total, 0);
+  assert.equal("snapshot" in result, false);
+  assert.deepEqual(
+    auditLog.list().map((event) => event.status),
+    ["portfolio-history-snapshot-empty"]
+  );
+});
 
 test("portfolio history controls list derived snapshots with bounded filters", () => {
   const auditLog = createMemoryOAuthAuditLog({
